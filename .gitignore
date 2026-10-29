@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+artifacts/
+cache/
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+# Local credentials and blockchain runtime data
+secrets/
+keys/
+node-data/
