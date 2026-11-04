@@ -73,6 +73,7 @@ contract MedicalAccessController {
     uint256 private requestCounter;
 
     error NotImplemented();
+    error InvalidRegistry();
 
     event RecordRegistered(
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId,
@@ -106,8 +107,10 @@ contract MedicalAccessController {
         bytes32 reportCommitment, uint64 timestamp
     );
 
-    // function blm diimplemen (semua)
     constructor(ParticipantRegistry participantRegistry) {
+        if (address(participantRegistry) == address(0) || address(participantRegistry).code.length == 0) {
+            revert InvalidRegistry();
+        }
         registry = participantRegistry;
     }
 
@@ -160,20 +163,20 @@ contract MedicalAccessController {
         revert NotImplemented();
     }
 
-    function getRequest(uint256 requestId) external pure returns (EmergencyRequest memory) {
-        revert NotImplemented();
+    function getRequest(uint256 requestId) external view returns (EmergencyRequest memory) {
+        return emergencyRequests[requestId];
     }
 
-    function getConsent(uint256 consentId) external pure returns (Consent memory) {
-        revert NotImplemented();
+    function getConsent(uint256 consentId) external view returns (Consent memory) {
+        return consents[consentId];
     }
 
-    function getRecord(bytes32 recordId) external pure returns (MedicalRecord memory) {
-        revert NotImplemented();
+    function getRecord(bytes32 recordId) external view returns (MedicalRecord memory) {
+        return records[recordId];
     }
 
-    function getReview(uint256 requestId) external pure returns (Review memory) {
-        revert NotImplemented();
+    function getReview(uint256 requestId) external view returns (Review memory) {
+        return reviews[requestId];
     }
 
     function isReviewOverdue(uint256 requestId) external pure returns (bool) {

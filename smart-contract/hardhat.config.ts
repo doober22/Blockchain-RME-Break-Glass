@@ -1,26 +1,24 @@
-import { defineConfig } from "hardhat/config";
+import { configVariable, defineConfig } from "hardhat/config";
+import { networkSettings } from "./scripts/environment.ts";
 
-const chainId = process.env.BESU_CHAIN_ID;
-if (chainId !== undefined && (!/^\d+$/.test(chainId) || !Number.isSafeInteger(Number(chainId)) || Number(chainId) <= 0)) {
-  throw new Error("BESU_CHAIN_ID must be a positive safe integer matching the Besu genesis.");
-}
+const { chainId, rpcUrl } = networkSettings();
 
 export default defineConfig({
   solidity: {
     version: "0.8.28",
     settings: {
       optimizer: { enabled: true, runs: 200 },
-      // Match the Besu genesis fork schedule when the private chain is configured.
       evmVersion: "paris",
     },
   },
   networks: {
+    local: { type: "edr-simulated", chainType: "l1", chainId },
     besu: {
       type: "http",
       chainType: "l1",
-      url: process.env.BESU_RPC_URL ?? "http://127.0.0.1:8545",
-      ...(chainId === undefined ? {} : { chainId: Number(chainId) }),
-      accounts: [],
+      url: rpcUrl,
+      chainId,
+      accounts: [configVariable("DEPLOYER_PRIVATE_KEY")],
     },
   },
 });
