@@ -1,0 +1,78 @@
+name: rme-break-glass
+
+x-besu: &besu
+  image: hyperledger/besu:26.11.0
+  user: "${BESU_UID:-1000}:${BESU_GID:-1000}"
+  init: true
+  cpus: 1.0
+  mem_limit: 768m
+  restart: unless-stopped
+  stop_grace_period: 30s
+  environment:
+    JAVA_OPTS: "-Xms64m -Xmx256m -XX:ActiveProcessorCount=1 -XX:TieredStopAtLevel=1"
+  command: ["--config-file=/config/besu.toml"]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  validator1:
+    <<: *besu
+    volumes:
+      - ./.runtime/nodes/validator1:/config
+      - ./.runtime/keys/validator1:/keys:ro
+      - ./.runtime/genesis.json:/genesis.json:ro
+      - ./.runtime/data/validator1:/data
+    networks:
+      chain:
+        ipv4_address: "${BESU_IP_PREFIX:-172.28.133}.11"
+  validator2:
+    <<: *besu
+    volumes:
+      - ./.runtime/nodes/validator2:/config
+      - ./.runtime/keys/validator2:/keys:ro
+      - ./.runtime/genesis.json:/genesis.json:ro
+      - ./.runtime/data/validator2:/data
+    networks:
+      chain:
+        ipv4_address: "${BESU_IP_PREFIX:-172.28.133}.12"
+  validator3:
+    <<: *besu
+    volumes:
+      - ./.runtime/nodes/validator3:/config
+      - ./.runtime/keys/validator3:/keys:ro
+      - ./.runtime/genesis.json:/genesis.json:ro
+      - ./.runtime/data/validator3:/data
+    networks:
+      chain:
+        ipv4_address: "${BESU_IP_PREFIX:-172.28.133}.13"
+  validator4:
+    <<: *besu
+    volumes:
+      - ./.runtime/nodes/validator4:/config
+      - ./.runtime/keys/validator4:/keys:ro
+      - ./.runtime/genesis.json:/genesis.json:ro
+      - ./.runtime/data/validator4:/data
+    networks:
+      chain:
+        ipv4_address: "${BESU_IP_PREFIX:-172.28.133}.14"
+  rpc:
+    <<: *besu
+    ports:
+      - "127.0.0.1:8545:8545"
+    volumes:
+      - ./.runtime/nodes/rpc:/config
+      - ./.runtime/keys/rpc:/keys:ro
+      - ./.runtime/genesis.json:/genesis.json:ro
+      - ./.runtime/data/rpc:/data
+    networks:
+      chain:
+        ipv4_address: "${BESU_IP_PREFIX:-172.28.133}.15"
+
+networks:
+  chain:
+    ipam:
+      config:
+        - subnet: "${BESU_DOCKER_SUBNET:-172.28.133.0/24}"

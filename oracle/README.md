@@ -10,4 +10,4 @@ Alur target: event final → ambil detail request → `GET /api/v1/encounters/{e
 
 `emergency-context.ts` hanya mendefinisikan tipe handoff, bukan schema validator. Authenticated API access, timeout/retry terbatas, fail-closed handling, request binding, idempotency, dan pemulihan checkpoint belum diimplementasikan. Secret oracle hanya di trusted worker environment, terpisah dari frontend dan deployer.
 
-Berikutnya: Role 1 menyediakan chain/finality dan endpoint container; Role 2 menyediakan kontrak deployable, event/getter scope, artifact, dan hash encoding. Implementer worker kemudian memasang viem dan runtime schema validation berdasarkan [kontrak integrasi](../docs/integration-contract.md).
+Chain tooling, endpoint container `http://rpc:8545`, deployment tooling, ABI arrays, dan getter metadata sekarang tersedia. Berikutnya: Role 2 menyelesaikan mutasi request/decision, akses record scope, dan hash encoding; implementer worker memasang viem serta runtime schema validation berdasarkan [kontrak integrasi](../docs/integration-contract.md). Oracle dalam container harus bergabung ke network proyek dan memakai endpoint internal, bukan localhost miliknya sendiri.

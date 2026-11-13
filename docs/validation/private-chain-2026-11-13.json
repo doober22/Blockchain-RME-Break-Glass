@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-11-13T14:22:45.460Z",
+  "chainId": 1337,
+  "checks": {
+    "initialHealth": {
+      "chainId": 1337,
+      "fromBlock": "174",
+      "toBlock": "178",
+      "validators": [
+        "0x1568cf646e2eb4da29c2bdb20018edf5a52d540c",
+        "0x7b8bfbf9ad743e23e49c37e1a41ceb3cd91975bf",
+        "0xb79d3ed2726786ff48726b7a8aff1dc8aea0882b",
+        "0xe05151bae3eae8804c5068c175d64c03e57643d1"
+      ],
+      "genesisHash": "0xf65b4c9cff8d571f35801f0b2ff04b78ab49a840323a1b51873af4e3944f4f2c"
+    },
+    "priorityFeeWei": "1000000000",
+    "approvedTransaction": "0x6b757ffe82558c1f22afe374a7982a8868913aff2ee46ff3921839a6e2d1daf0",
+    "unauthorizedTransaction": {
+      "address": "0xA5DcF3c05Dc9f1Df362dE9bBC6D5ed230Df7B638",
+      "funded": true,
+      "rejection": "RPC -32007: Sender account not authorized to send transactions",
+      "nonce": 0
+    },
+    "rpcExposure": "loopback RPC only; ADMIN/PERM/QBFT/DEBUG unavailable on host endpoint",
+    "oneValidatorStopped": {
+      "chainId": 1337,
+      "fromBlock": "189",
+      "toBlock": "191",
+      "validators": [
+        "0x1568cf646e2eb4da29c2bdb20018edf5a52d540c",
+        "0x7b8bfbf9ad743e23e49c37e1a41ceb3cd91975bf",
+        "0xb79d3ed2726786ff48726b7a8aff1dc8aea0882b",
+        "0xe05151bae3eae8804c5068c175d64c03e57643d1"
+      ],
+      "genesisHash": "0xf65b4c9cff8d571f35801f0b2ff04b78ab49a840323a1b51873af4e3944f4f2c",
+      "transactionHash": "0x4d1ed6bd9a6743d6672b748eabce95f1345eda55e1b17f88e60bcbdfbc9d5db4"
+    },
+    "persistence": {
+      "blockNumber": "182",
+      "blockHash": "0x5c19e82d0da2a4e22974ff24be59cfd4c424c4c6ac65ec1ab55e73b0af01a4eb",
+      "transactionHash": "0x6b757ffe82558c1f22afe374a7982a8868913aff2ee46ff3921839a6e2d1daf0"
+    },
+    "finalHealth": {
+      "chainId": 1337,
+      "fromBlock": "201",
+      "toBlock": "204",
+      "validators": [
+        "0x1568cf646e2eb4da29c2bdb20018edf5a52d540c",
+        "0x7b8bfbf9ad743e23e49c37e1a41ceb3cd91975bf",
+        "0xb79d3ed2726786ff48726b7a8aff1dc8aea0882b",
+        "0xe05151bae3eae8804c5068c175d64c03e57643d1"
+      ],
+      "genesisHash": "0xf65b4c9cff8d571f35801f0b2ff04b78ab49a840323a1b51873af4e3944f4f2c"
+    }
+  },
+  "passed": true
+}

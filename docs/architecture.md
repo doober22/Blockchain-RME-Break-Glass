@@ -1,35 +1,42 @@
-# Arsitektur dan keterbatasan
+# Arsitektur dan batas kepercayaan
 
-Diagram menunjukkan rancangan target. Saat ini hanya source skeleton kontrak, dokumentasi, serta scaffold frontend/oracle tersedia. Semua jalur runtime masih Planned.
+Infrastruktur menyediakan empat validator QBFT dan satu RPC non-validator. Source kontrak serta deployment tooling tersedia; operasi medis controller dan semua layanan aplikasi masih Planned.
 
 ```mermaid
 flowchart LR
-    UI["Frontend / MetaMask — Planned"] --> RPC["RPC / Besu QBFT, 4 validator — Planned"]
-    RPC --> SC["Smart contracts — source skeleton, belum operasional"]
-    SC -. "event final" .-> OR["Oracle worker — Planned"]
+    UI["Frontend / MetaMask — Planned"] --> RPC["RPC non-validator — Besu"]
+    RPC --> VAL["4 validator QBFT — simulasi lokal"]
+    VAL --> SC["Registry + controller skeleton"]
+    SC -. "event final, Planned" .-> OR["Oracle worker — Planned"]
     OR --> API["Mock hospital API sintetis — Planned"]
-    OR -. "keputusan terikat request" .-> RPC
+    OR -. "keputusan, Planned" .-> RPC
     UI --> GW["Facility gateway — Planned"]
     GW --> RPC
     GW --> STORE["Encrypted storage / key service — Planned"]
-    SC -. "audit events" .-> IDX["Audit indexer / notifikasi — Planned"]
+    SC -. "audit events, Planned" .-> IDX["Audit indexer / notifikasi — Planned"]
     IDX --> UI
 ```
 
-## Batas kepercayaan dan data
+## Infrastruktur dan trust boundaries
 
-- Wallet menandatangani transaksi. Gateway kelak membuktikan wallet lewat signed challenge, memeriksa otorisasi final dan status terkini, lalu melayani sesi baca singkat. Frontend bukan penegak keamanan tunggal.
-- Smart contract direncanakan menyimpan metadata minimum, hash ciphertext, consent, request/grant, dan event. NIK, diagnosis, bukti klinis mentah, kunci, serta URL bertoken tidak boleh dimasukkan on-chain. Private chain tetap mereplikasi data ke peserta.
-- Ciphertext, kunci, fakta klinis, dan pemetaan identitas tetap off-chain di fasilitas. Gateway harus memeriksa integrity ciphertext dan tidak membagikan storage URL langsung atau kunci. Enkripsi/key service belum diimplementasikan.
-- Validator memeriksa aturan eksekusi dan konsensus, bukan kebenaran medis. Oracle bergantung pada sumber fasilitas yang terautentikasi dan dikelola independen dari pernyataan dokter; input emergency dari frontend saja tidak cukup.
-- Empat container validator lokal direncanakan sebagai simulasi konsorsium; satu host tidak membuktikan hosting organisasi yang independen atau toleransi kegagalan antarfasilitas. Pengujian quorum belum tersedia.
+RPC host dibatasi ke 127.0.0.1:8545 dengan namespace ETH/NET/WEB3 serta explicit host/CORS allowlists. Container aplikasi bergabung ke network proyek dan memakai http://rpc:8545. Monitoring QBFT menggunakan loopback validator1 melalui probe operator, tanpa port host. Detail berada pada [panduan chain](private-chain.md).
 
-## Alur target dan audit
+Kelima node memakai node/account permissioning lokal dengan allowlist konsisten. Approval/funding akun merupakan tugas operator; registrasi role/fasilitas/kredensial dalam ParticipantRegistry adalah kontrol aplikasi terpisah. Local permissioning tidak mencegah peserta jahat menyalin atau membocorkan ledger. Empat container pada satu host tidak membuktikan hosting organisasi yang independen.
 
-Akses normal terikat patient consent, dokter, record, dan expiry. Break-glass membutuhkan request terbatas, verifikasi oracle, lalu grant read-only berumur pendek. Scope, status kredensial, penutupan, dan expiry harus diperiksa lagi saat penggunaan. Batas waktu dalam skeleton belum ditegakkan oleh metode bisnis.
+Validator memeriksa aturan eksekusi dan konsensus, bukan kebenaran medis. Oracle kelak bergantung pada API fasilitas terautentikasi yang dikelola independen dari pernyataan dokter. Form frontend saja tidak cukup membuktikan emergency.
 
-Indexer kelak melanjutkan checkpoint dan melakukan deduplikasi untuk riwayat/notifikasi pasien. Auditor terpisah dari dokter pemohon melakukan review setelah penggunaan. Bukti klinis dibuka lewat prosedur off-chain tersendiri.
+## Data dan alur target
 
-Event `AccessAuthorized` hanya bukti otorisasi yang tercatat, bukan bukti pengiriman atau pembacaan RME. Gateway perlu log hasil pengiriman dan percobaan gagal, lalu rekonsiliasi terhadap event final. Transaksi yang revert tidak menghasilkan event kontrak yang persisten.
+Metadata minimum, ciphertext hash, consent, request/grant, dan audit events direncanakan on-chain. NIK, diagnosis, bukti klinis mentah, encryption key, dan storage URL bertoken tidak boleh berada dalam calldata, event, atau storage kontrak. Ciphertext, kunci, pemetaan identitas, serta clinical facts tetap off-chain di fasilitas.
 
-Belum tersedia evaluasi latency, gas, confidentiality, expiry/revocation, ketahanan quorum, atau perbandingan SATUSEHAT. Lihat [setup](setup.md) dan [kontrak integrasi](integration-contract.md) untuk status handoff.
+Gateway kelak membuktikan wallet melalui signed challenge, menunggu receipt otorisasi final, memeriksa scope/kredensial/expiry/revocation terkini, menguji integrity ciphertext, dan melayani sesi baca singkat tanpa membagikan kunci atau URL langsung. Normal access terikat patient consent; break-glass memerlukan keputusan oracle yang sah dan grant read-only terbatas.
+
+Constructor registry/controller serta getter metadata tersedia, tetapi operasi medis belum dapat menerbitkan grant. Konstanta waktu pada skeleton belum membuktikan penegakan kebijakan. Lihat [kontrak](smart-contracts.md) dan [integrasi](integration-contract.md).
+
+## Audit dan keterbatasan
+
+Indexer/notifikasi kelak memakai checkpoint dan deduplikasi. Auditor berbeda dari dokter pemohon dan memeriksa penggunaan break-glass setelah akses. Pembukaan bukti klinis tetap memerlukan prosedur off-chain.
+
+Event AccessAuthorized hanya membuktikan otorisasi yang tercatat, bukan pengiriman atau pembacaan RME. Gateway perlu log pengiriman dan kegagalan untuk rekonsiliasi. Transaksi revert tidak meninggalkan event kontrak yang persisten.
+
+Pengujian chain, transaksi, dan deployment tidak membuktikan confidentiality sistem lengkap, oracle security, latency target, atau keunggulan dibanding SATUSEHAT. Hasil pengujian yang benar-benar dijalankan terdapat pada [setup](setup.md).

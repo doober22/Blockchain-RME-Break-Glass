@@ -16,3 +16,9 @@ Thumbs.db
 secrets/
 keys/
 node-data/
+
+# Generated private-chain identities, permission files, and ledger databases
+infrastructure/.runtime/
+infrastructure/.chain.lock
+smart-contract/deployments/*.pending.json
+smart-contract/deployments/*.lock
