@@ -11,6 +11,32 @@
     "type": "constructor"
   },
   {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "role",
+        "type": "bytes32"
+      }
+    ],
+    "name": "IneligibleParticipant",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidCiphertextHash",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidRecordId",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidRegistry",
     "type": "error"
@@ -18,6 +44,55 @@
   {
     "inputs": [],
     "name": "NotImplemented",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "recordId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RecordAlreadyExists",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "recordId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RecordInactive",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "recordId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "RecordNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "expected",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "actual",
+        "type": "bytes32"
+      }
+    ],
+    "name": "WrongFacility",
     "type": "error"
   },
   {
@@ -513,7 +588,7 @@
     ],
     "name": "deactivateRecord",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -857,7 +932,7 @@
     ],
     "name": "registerRecord",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

@@ -2,7 +2,7 @@
 
 Solidity contracts, ABI exports, tests, and deployment tooling for the RME private chain.
 
-`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` holds the medical-access data model and references that registry. The deployment tooling connects both contracts and exports their public interfaces for application services.
+`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` implements record registration/deactivation and holds the remaining medical-access data model, referencing that registry. Consent, emergency grants, and read authorization remain reverting stubs. The deployment tooling connects both contracts and exports their public interfaces for application services.
 
 ## Toolchain
 
@@ -47,9 +47,19 @@ Records describe ownership, issuing facility, ciphertext hash, category, and act
 | `constructor(registry)` | Stores a nonzero registry address with deployed code. |
 | `registry()` and constant getters | Return configuration. |
 | `getRecord()`, `getConsent()`, `getRequest()`, `getReview()` | Return metadata with an `exists` flag. |
-| `registerRecord()`, `deactivateRecord()`, `grantConsent()`, `revokeConsent()`, `canRead()`, `authorizeAccess()`, `requestEmergency()`, `resolveEmergency()`, `closeEmergency()`, `submitReview()`, `getEffectiveStatus()`, `isReviewOverdue()` | Stubs; all revert with `NotImplemented()`. |
+| `registerRecord()` | Eligible gateway registers a unique nonzero record ID and ciphertext hash for an eligible patient. Issuing facility comes from the gateway's current registry affiliation. Stores category and emits `RecordRegistered`. |
+| `deactivateRecord()` | Eligible gateway of the issuing facility deactivates an existing active record and emits `RecordDeactivated`. Preserves all metadata; repeated deactivation is rejected. |
+| `grantConsent()`, `revokeConsent()`, `canRead()`, `authorizeAccess()`, `requestEmergency()`, `resolveEmergency()`, `closeEmergency()`, `submitReview()`, `getEffectiveStatus()`, `isReviewOverdue()` | Stubs; all revert with `NotImplemented()`. |
 
 The metadata getters return `exists=false` for unknown IDs. Callers must inspect that flag rather than treating default field values as a valid entry. The constructor checks that the registry address contains code; the deployment workflow additionally verifies the expected registry bytecode and controller reference.
+
+Record IDs cannot be reused, including after deactivation or by a different facility. Patient, issuing facility, ciphertext hash, and category cannot be changed. Corrections require a new ID. Any eligible gateway of the issuing facility may deactivate a record; authority belongs to the facility rather than only the original registering wallet. Moving a gateway to another facility does not transfer the record's issuing facility.
+
+Registration explicitly requires current patient eligibility, including credential expiry and active status, in addition to the design's registered-patient requirement. Deactivation does not require patient eligibility, so disabling a patient does not prevent cleanup by an eligible issuing gateway. Gateway eligibility is checked at every mutation, including facility activity and the exact credential-expiry boundary. There is no category-code catalogue in the current design, so all `uint16` categories are accepted, including zero; category does not confer authority.
+
+Controller errors added for this lifecycle: `IneligibleParticipant(account, role)`, `InvalidRecordId()`, `InvalidCiphertextHash()`, `RecordAlreadyExists(recordId)`, `RecordNotFound(recordId)`, `RecordInactive(recordId)`, and `WrongFacility(expected, actual)`. Internal helpers centralize participant eligibility, record existence, and issuing-gateway checks. Unknown-record deactivation reports `RecordNotFound` before caller checks; getters already expose existence.
+
+These methods register and retire metadata only. They neither verify ciphertext contents nor grant medical reads. Clinical payloads, keys, and integrity verification remain off-chain responsibilities.
 
 Stored request statuses are `PENDING`, `REJECTED`, `ACTIVE`, and `CLOSED`. A separate effective-status enum includes `EXPIRED`. The request-record array and membership mapping describe record scope, while `usedAccessIds` reserves storage for access-ID replay tracking. The grouped stubs explicitly reject calls, including authorization queries, so the declared interface cannot issue access grants.
 
@@ -79,7 +89,7 @@ npm test
 
 Local tests require no Besu node or private key. Compilation produces expected unused-parameter warnings for stubs.
 
-Contract tests check registry permissions, invalid inputs, role separation, facility status, and credential expiry, including the exact expiry boundary. Controller tests check registry wiring, metadata reads, constants, and rejection by every stub. Deployment tests exercise the same deployment helper used by the CLI against isolated Hardhat chains with temporary signers and output files.
+Contract tests check registry permissions, invalid inputs, role separation, facility status, and credential expiry, including the exact expiry boundary. Controller tests check registry wiring, metadata reads, constants, record lifecycle policy/events, and rejection by every remaining stub. `ControllerFixture.sol` supplies two facilities, two patients, clinicians, gateways, oracles, and an auditor for subsequent policy tests. Deployment tests exercise the same deployment helper used by the CLI against isolated Hardhat chains with temporary signers and output files.
 
 ## Configuration and deployment
 
@@ -119,4 +129,19 @@ Use explicit `--redeploy` after a chain reset, configuration/artifact change, or
 
 ## Validation
 
-Verified on **4 November 2026**: compilation and TypeScript checks passed; **21 Solidity tests** passed, including 256 generated expiry cases; **8 deployment tests** passed on local Hardhat EVMs. Besu deployment remains unverified because the configured RPC was unavailable.
+Historical foundation verification on **13 November 2026** included Besu deployment/reuse and chain acceptance; see [the recorded chain results](private-chain.md#pemeriksaan-dan-hasil). That supersedes the earlier November 4 observation that Besu was unavailable.
+
+Record-lifecycle verification on **26 November 2026**, using Node **24.14.0** on Windows: `npm --prefix smart-contract test` passed compilation/ABI export, TypeScript checking, **36 Solidity tests**, and **8 deployment tests**. There are 15 new record-lifecycle tests, including **256 gateway-expiry fuzz runs**, alongside the existing registry expiry fuzz test (256 runs). Unused-parameter warnings are expected from the ten remaining controller stubs.
+
+| Requirement | Evidence in `smart-contract/test/RecordLifecycle.t.sol` | Observed result |
+| --- | --- | --- |
+| FR-01 / NFR-02: current eligibility and role restrictions | `testAllNonGatewayRolesCannotMutateRecords`, `testInactiveRevokedAndExpiredGatewayCannotMutate`, `testRejectsInactiveRevokedAndExpiredPatientCredentials` | Passed; admin-only, clinician, oracle, auditor, patient, and unknown accounts cannot act as gateways |
+| FR-02: metadata registration and issuing facility | `testRegistersMetadataAndEmitsIssuingFacility`, `testDerivesFacilityForEachGatewayAndRetainsCategory` | Passed; state and registration event match patient/hash/facility |
+| FR-02: invalid identifiers and immutable identity | `testRejectsZeroRecordAndCiphertextHashWithoutWritingMetadata`, `testRejectsUnregisteredZeroAndWrongRolePatients`, `testRejectsDuplicateAcrossFacilitiesAndAfterDeactivation` | Passed; invalid attempts do not create or overwrite records |
+| FR-02: issuer-only deactivation and preserved history | `testDeactivationPreservesMetadataAndEmitsEvent`, `testWrongFacilityAndReaffiliatedGatewayCannotDeactivate`, `testAnotherEligibleGatewayOfIssuerCanDeactivate`, `testRejectsUnknownAndAlreadyInactiveRecords` | Passed; facility-bound authority and metadata retention |
+| FR-01 / NFR-06: exact credential expiry and facility shutdown | `testFuzzGatewayCredentialExpiryBoundary`, `testInactiveFacilityBlocksRegistrationAndDeactivation` | Passed; mutation denied at expiry, restored after valid renewal/reactivation |
+| Safe cleanup after patient deactivation | `testPatientDeactivationDoesNotBlockRecordCleanup` | Passed; eligible issuer can still deactivate |
+
+The public ABI has been regenerated. The existing `deployments/1337.json` still describes the historical skeleton deployment; this changed controller has **not** been deployed to Besu during this chunk. Deployment verification will reject reuse against changed artifacts. Explicit deployment/reverification belongs to the contract-release chunk; no ledger reset or existing deployment replacement was performed here.
+
+FR-11's ciphertext hash metadata is available, but actual integrity checking remains a future gateway task. These results do not establish consent, break-glass, medical-data delivery, complete confidentiality, or application latency.

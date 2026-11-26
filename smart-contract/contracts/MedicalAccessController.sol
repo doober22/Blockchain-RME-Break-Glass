@@ -74,6 +74,13 @@ contract MedicalAccessController {
 
     error NotImplemented();
     error InvalidRegistry();
+    error IneligibleParticipant(address account, bytes32 role);
+    error InvalidRecordId();
+    error InvalidCiphertextHash();
+    error RecordAlreadyExists(bytes32 recordId);
+    error RecordNotFound(bytes32 recordId);
+    error RecordInactive(bytes32 recordId);
+    error WrongFacility(bytes32 expected, bytes32 actual);
 
     event RecordRegistered(
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId,
@@ -114,12 +121,30 @@ contract MedicalAccessController {
         registry = participantRegistry;
     }
 
-    function registerRecord(bytes32 recordId, address patient, bytes32 ciphertextHash, uint16 categoryCode) external pure {
-        revert NotImplemented();
+    function registerRecord(bytes32 recordId, address patient, bytes32 ciphertextHash, uint16 categoryCode) external {
+        ParticipantRegistry.Participant memory gateway = _requireEligible(msg.sender, registry.GATEWAY_ROLE());
+        _requireEligible(patient, registry.PATIENT_ROLE());
+        if (recordId == bytes32(0)) revert InvalidRecordId();
+        if (ciphertextHash == bytes32(0)) revert InvalidCiphertextHash();
+        if (records[recordId].exists) revert RecordAlreadyExists(recordId);
+
+        records[recordId] = MedicalRecord({
+            exists: true,
+            patient: patient,
+            facilityId: gateway.facilityId,
+            ciphertextHash: ciphertextHash,
+            categoryCode: categoryCode,
+            active: true
+        });
+        emit RecordRegistered(recordId, patient, gateway.facilityId, ciphertextHash);
     }
 
-    function deactivateRecord(bytes32 recordId) external pure {
-        revert NotImplemented();
+    function deactivateRecord(bytes32 recordId) external {
+        MedicalRecord storage record = _requireRecord(recordId);
+        _requireIssuingGateway(record);
+        if (!record.active) revert RecordInactive(recordId);
+        record.active = false;
+        emit RecordDeactivated(recordId, record.patient, record.facilityId);
     }
 
     function grantConsent(address clinician, bytes32 recordId, uint64 expiresAt) external pure returns (uint256 consentId) {
@@ -181,5 +206,22 @@ contract MedicalAccessController {
 
     function isReviewOverdue(uint256 requestId) external pure returns (bool) {
         revert NotImplemented();
+    }
+
+    function _requireEligible(address account, bytes32 role)
+        internal view returns (ParticipantRegistry.Participant memory)
+    {
+        if (!registry.isEligible(account, role)) revert IneligibleParticipant(account, role);
+        return registry.getParticipant(account);
+    }
+
+    function _requireRecord(bytes32 recordId) internal view returns (MedicalRecord storage record) {
+        record = records[recordId];
+        if (!record.exists) revert RecordNotFound(recordId);
+    }
+
+    function _requireIssuingGateway(MedicalRecord storage record) internal view {
+        ParticipantRegistry.Participant memory gateway = _requireEligible(msg.sender, registry.GATEWAY_ROLE());
+        if (gateway.facilityId != record.facilityId) revert WrongFacility(record.facilityId, gateway.facilityId);
     }
 }
