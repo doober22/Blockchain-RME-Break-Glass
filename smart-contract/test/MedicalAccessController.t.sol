@@ -14,6 +14,7 @@ contract MedicalAccessControllerTest is ControllerFixture {
         require(controller.REQUEST_TTL() == 120 seconds);
         require(controller.MAX_RECORDS() == 20);
         require(controller.REVIEW_TARGET() == 24 hours);
+        require(controller.NORMAL_MODE() == 0 && controller.EMERGENCY_MODE() == 1);
     }
 
     function testRejectZeroOrNonContractRegistry() public {
@@ -34,17 +35,13 @@ contract MedicalAccessControllerTest is ControllerFixture {
         bytes32 id = keccak256("synthetic-record");
         bytes32[] memory recordIds = new bytes32[](1);
         recordIds[0] = id;
-        bytes[] memory calls = new bytes[](10);
-        calls[0] = abi.encodeCall(controller.grantConsent, (address(this), id, 10_000));
-        calls[1] = abi.encodeCall(controller.revokeConsent, (1));
-        calls[2] = abi.encodeCall(controller.canRead, (address(this), id, 0, 1));
-        calls[3] = abi.encodeCall(controller.authorizeAccess, (address(this), id, 0, 1, id));
-        calls[4] = abi.encodeCall(controller.requestEmergency, (address(this), recordIds, id, 1, id, 60));
-        calls[5] = abi.encodeCall(controller.resolveEmergency, (1, true, id, 1_000, 1_060));
-        calls[6] = abi.encodeCall(controller.closeEmergency, (1, 1));
-        calls[7] = abi.encodeCall(controller.submitReview, (1, 0, id));
-        calls[8] = abi.encodeCall(controller.getEffectiveStatus, (1));
-        calls[9] = abi.encodeCall(controller.isReviewOverdue, (1));
+        bytes[] memory calls = new bytes[](6);
+        calls[0] = abi.encodeCall(controller.requestEmergency, (address(this), recordIds, id, 1, id, 60));
+        calls[1] = abi.encodeCall(controller.resolveEmergency, (1, true, id, 1_000, 1_060));
+        calls[2] = abi.encodeCall(controller.closeEmergency, (1, 1));
+        calls[3] = abi.encodeCall(controller.submitReview, (1, 0, id));
+        calls[4] = abi.encodeCall(controller.getEffectiveStatus, (1));
+        calls[5] = abi.encodeCall(controller.isReviewOverdue, (1));
         for (uint256 i; i < calls.length; ++i) {
             (bool success, bytes memory result) = address(controller).call(calls[i]);
             require(!success, "unfinished path succeeded");

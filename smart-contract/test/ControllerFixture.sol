@@ -30,6 +30,16 @@ abstract contract ControllerFixture {
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId, bytes32 ciphertextHash
     );
     event RecordDeactivated(bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId);
+    event ConsentGranted(
+        uint256 indexed consentId, address indexed patient, address indexed clinician, bytes32 recordId, uint64 expiresAt
+    );
+    event ConsentRevoked(
+        uint256 indexed consentId, address indexed patient, address indexed clinician, bytes32 recordId
+    );
+    event AccessAuthorized(
+        bytes32 indexed accessId, bytes32 indexed recordId, address indexed patient,
+        address clinician, address gateway, uint8 mode, uint256 grantId, uint64 timestamp
+    );
 
     function setUp() public virtual {
         vm.warp(1_000);
@@ -55,5 +65,10 @@ abstract contract ControllerFixture {
 
     function _expectIneligible(address account, bytes32 role) internal {
         vm.expectRevert(abi.encodeWithSelector(MedicalAccessController.IneligibleParticipant.selector, account, role));
+    }
+
+    function _grantConsent() internal returns (uint256) {
+        vm.prank(PATIENT);
+        return controller.grantConsent(CLINICIAN_B, RECORD, 2_000);
     }
 }

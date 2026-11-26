@@ -13,6 +13,50 @@
   {
     "inputs": [
       {
+        "internalType": "bytes32",
+        "name": "accessId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "AccessIdAlreadyUsed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "consentId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentAlreadyRevoked",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "consentId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ConsentNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "facilityId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "InactiveFacility",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "account",
         "type": "address"
@@ -28,7 +72,23 @@
   },
   {
     "inputs": [],
+    "name": "InvalidAccessId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidCiphertextHash",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "expiresAt",
+        "type": "uint64"
+      }
+    ],
+    "name": "InvalidConsentExpiry",
     "type": "error"
   },
   {
@@ -42,8 +102,45 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "consentId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "NotConsentOwner",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "NotImplemented",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "recordId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "NotRecordOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ReadAccessDenied",
     "type": "error"
   },
   {
@@ -430,6 +527,19 @@
   },
   {
     "inputs": [],
+    "name": "EMERGENCY_MODE",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "MAX_ATTESTATION_AGE",
     "outputs": [
       {
@@ -462,6 +572,19 @@
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "NORMAL_MODE",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
@@ -523,7 +646,7 @@
     ],
     "name": "authorizeAccess",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -557,7 +680,7 @@
         "type": "bool"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -885,7 +1008,7 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1035,7 +1158,7 @@
     ],
     "name": "revokeConsent",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

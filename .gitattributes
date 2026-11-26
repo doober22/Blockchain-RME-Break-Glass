@@ -1,0 +1,11 @@
+# Normalize text in Git; use CRLF in working copies by default.
+* text=auto eol=crlf
+
+# Keep Linux shell scripts and Dockerfiles compatible with container tooling.
+*.sh text eol=lf
+*.bash text eol=lf
+Dockerfile text eol=lf
+Dockerfile.* text eol=lf
+
+# Keep this policy file consistent across platforms.
+.gitattributes text eol=lf

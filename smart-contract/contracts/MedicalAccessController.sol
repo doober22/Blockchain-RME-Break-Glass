@@ -11,6 +11,8 @@ contract MedicalAccessController {
     uint64 public constant REQUEST_TTL = 120 seconds;
     uint256 public constant MAX_RECORDS = 20;
     uint64 public constant REVIEW_TARGET = 24 hours;
+    uint8 public constant NORMAL_MODE = 0;
+    uint8 public constant EMERGENCY_MODE = 1;
 
     enum RequestStatus { PENDING, REJECTED, ACTIVE, CLOSED }
     enum EffectiveStatus { PENDING, REJECTED, ACTIVE, CLOSED, EXPIRED }
@@ -81,6 +83,15 @@ contract MedicalAccessController {
     error RecordNotFound(bytes32 recordId);
     error RecordInactive(bytes32 recordId);
     error WrongFacility(bytes32 expected, bytes32 actual);
+    error InactiveFacility(bytes32 facilityId);
+    error NotRecordOwner(bytes32 recordId, address account);
+    error InvalidConsentExpiry(uint64 expiresAt);
+    error ConsentNotFound(uint256 consentId);
+    error NotConsentOwner(uint256 consentId, address account);
+    error ConsentAlreadyRevoked(uint256 consentId);
+    error InvalidAccessId();
+    error AccessIdAlreadyUsed(bytes32 accessId);
+    error ReadAccessDenied();
 
     event RecordRegistered(
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId,
@@ -147,20 +158,50 @@ contract MedicalAccessController {
         emit RecordDeactivated(recordId, record.patient, record.facilityId);
     }
 
-    function grantConsent(address clinician, bytes32 recordId, uint64 expiresAt) external pure returns (uint256 consentId) {
-        revert NotImplemented();
+    function grantConsent(address clinician, bytes32 recordId, uint64 expiresAt) external returns (uint256 consentId) {
+        MedicalRecord storage record = _requireActiveRecord(recordId);
+        if (record.patient != msg.sender) revert NotRecordOwner(recordId, msg.sender);
+        _requireEligible(msg.sender, registry.PATIENT_ROLE());
+        _requireEligible(clinician, registry.CLINICIAN_ROLE());
+        if (expiresAt <= block.timestamp) revert InvalidConsentExpiry(expiresAt);
+
+        consentId = ++consentCounter;
+        consents[consentId] = Consent({
+            exists: true,
+            patient: msg.sender,
+            clinician: clinician,
+            recordId: recordId,
+            createdAt: uint64(block.timestamp),
+            expiresAt: expiresAt,
+            revoked: false
+        });
+        emit ConsentGranted(consentId, msg.sender, clinician, recordId, expiresAt);
     }
 
-    function revokeConsent(uint256 consentId) external pure {
-        revert NotImplemented();
+    function revokeConsent(uint256 consentId) external {
+        Consent storage consent = consents[consentId];
+        if (!consent.exists) revert ConsentNotFound(consentId);
+        if (consent.patient != msg.sender) revert NotConsentOwner(consentId, msg.sender);
+        if (consent.revoked) revert ConsentAlreadyRevoked(consentId);
+        // Removing access remains possible after credentials or the record become inactive.
+        consent.revoked = true;
+        emit ConsentRevoked(consentId, consent.patient, consent.clinician, consent.recordId);
     }
 
-    function canRead(address clinician, bytes32 recordId, uint8 mode, uint256 grantId) external pure returns (bool) {
-        revert NotImplemented();
+    function canRead(address clinician, bytes32 recordId, uint8 mode, uint256 grantId) external view returns (bool) {
+        return _canRead(clinician, recordId, mode, grantId);
     }
 
-    function authorizeAccess(address clinician, bytes32 recordId, uint8 mode, uint256 grantId, bytes32 accessId) external pure {
-        revert NotImplemented();
+    function authorizeAccess(address clinician, bytes32 recordId, uint8 mode, uint256 grantId, bytes32 accessId) external {
+        MedicalRecord storage record = _requireRecord(recordId);
+        _requireIssuingGateway(record);
+        if (accessId == bytes32(0)) revert InvalidAccessId();
+        if (usedAccessIds[accessId]) revert AccessIdAlreadyUsed(accessId);
+        if (!_canRead(clinician, recordId, mode, grantId)) revert ReadAccessDenied();
+        usedAccessIds[accessId] = true;
+        emit AccessAuthorized(
+            accessId, recordId, record.patient, clinician, msg.sender, mode, grantId, uint64(block.timestamp)
+        );
     }
 
     function requestEmergency(
@@ -218,6 +259,28 @@ contract MedicalAccessController {
     function _requireRecord(bytes32 recordId) internal view returns (MedicalRecord storage record) {
         record = records[recordId];
         if (!record.exists) revert RecordNotFound(recordId);
+    }
+
+    function _requireActiveRecord(bytes32 recordId) internal view returns (MedicalRecord storage record) {
+        record = _requireRecord(recordId);
+        if (!record.active) revert RecordInactive(recordId);
+        if (!registry.getFacility(record.facilityId).active) revert InactiveFacility(record.facilityId);
+    }
+
+    /// @dev Shared by queries and transaction-time authorization; gateway eligibility is checked separately.
+    function _canRead(address clinician, bytes32 recordId, uint8 mode, uint256 grantId) internal view returns (bool) {
+        // Emergency grants remain fail-closed until their policy is implemented.
+        if (mode != NORMAL_MODE) return false;
+        Consent storage consent = consents[grantId];
+        MedicalRecord storage record = records[recordId];
+        if (
+            !consent.exists || consent.revoked || block.timestamp >= consent.expiresAt
+            || consent.clinician != clinician || consent.recordId != recordId
+            || !record.exists || !record.active || consent.patient != record.patient
+        ) return false;
+        return registry.isEligible(record.patient, registry.PATIENT_ROLE())
+            && registry.isEligible(clinician, registry.CLINICIAN_ROLE())
+            && registry.getFacility(record.facilityId).active;
     }
 
     function _requireIssuingGateway(MedicalRecord storage record) internal view {

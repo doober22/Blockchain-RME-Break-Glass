@@ -19,6 +19,16 @@ Manifest schemaVersion 1 berisi chainId, genesisHash, deployer, initialAdmin, co
 
 Frontend hanya boleh menyalin manifest publik dan dua ABI ke build assets. Helper frontend memeriksa chain ID wallet/RPC dan address nonzero; deploymentTransactions pada tipe scaffold masih unknown sehingga belum memvalidasi schema baru secara lengkap. Integrasi viem berikutnya harus memvalidasi schemaVersion, hash, receipt, code, dan kesesuaian artifact. Ulangi guard saat chainChanged, perubahan RPC, serta sebelum aksi. Jangan mengimpor root .env, deployment scripts, atau service/encryption secrets ke browser.
 
+## Consent dan authorization normal (implemented; runtime gateway Planned)
+
+Controller source sekarang mengimplementasikan `registerRecord`, `deactivateRecord`, `grantConsent`, `revokeConsent`, `canRead`, dan `authorizeAccess`. Mode publik: `NORMAL_MODE() = 0`, `EMERGENCY_MODE() = 1`. `canRead` mengembalikan false untuk mode emergency sampai kebijakannya diimplementasikan. Manifest 1337 yang tersimpan masih deployment skeleton historis; ABI source terbaru harus dipasangkan dengan deployment baru yang diverifikasi, bukan diasumsikan cocok dengan address lama.
+
+Pasien pemilik record aktif memberi consent untuk satu dokter, satu record, dan expiry Unix seconds di masa depan. Keduanya harus eligible; fasilitas penerbit aktif. Consent normal boleh lintas fasilitas. Pasien asli dapat mencabut consent walaupun kredensial/role-nya sudah tidak aktif. Consent baru mempunyai ID baru; pencabutan tidak menghapus metadata lama.
+
+`canRead(clinician, recordId, mode, grantId)` adalah query publik yang memeriksa policy terkini, bukan bukti penguasaan wallet. Runtime gateway kelak harus memverifikasi challenge wallet dokter, memeriksa query, lalu mengirim `authorizeAccess` sebagai gateway eligible fasilitas penerbit record. Kontrak memeriksa ulang policy saat eksekusi; query true tidak menjamin transaksi berikutnya berhasil. Expiry bersifat eksklusif: akses ditolak pada `block.timestamp >= expiresAt`.
+
+`accessId` harus bytes32 nonzero baru untuk setiap otorisasi dan unik lintas record/grant/gateway dalam satu instance controller. Hanya transaksi sukses yang memakai ID dan emit `AccessAuthorized`; transaksi gagal tidak meninggalkan event. Setelah receipt final sukses, gateway tetap harus memeriksa ulang status terkini, menguji ciphertext, dan mencatat outcome pengiriman off-chain. Implementasi HTTP, wallet challenge, enkripsi, dan delivery log masih Planned. Lihat [panduan kontrak](smart-contracts.md#normal-consent-and-read-authorization) untuk error, policy, dan bukti tes.
+
 ## Oracle: event → API → transaksi (Planned)
 
 1. Dengarkan EmergencyRequested(requestId, patient, clinician, facilityId, requestHash, deadline) dari address tervalidasi pada chain 1337. Tunggu blok QBFT yang sudah dikomit dan receipt sukses; implementer harus menguji dukungan RPC finality/tag sebelum mengandalkannya.
