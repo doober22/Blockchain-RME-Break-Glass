@@ -1,0 +1,21 @@
+{
+  "chainId": 1337,
+  "genesisHash": "0x0d24e07511cb3aebb080bc5a9cb88ecc456fa6168c9a606c69a704c5491e33c7",
+  "controller": "0x97e71d7a2de8d3a499876A2f7eB913EEcb9a8Db4",
+  "recordId": "0xdf616ffca2334c7db18b844c0ac99035b08210508786ec11f184c36be7dbbd9b",
+  "ciphertextHash": "0xe18af8e3db09e1f1c37b63b900bcc385f49524ed1a1103c2dd787aa6bc591042",
+  "normalConsent": {
+    "grant": "0xd4f136b0b9efd686ed982d29aaa3b5834fa7068e6f48e8958eae489790af1b2a",
+    "authorization": "0x4f3cdb1608935cb13c5511ab3bf61b9541cd01a3dc2f23f99539cab6459802dc",
+    "accessId": "0x132bcbeed1064507471a235d5687196e79ed4989f785512ad97723b8754c8563",
+    "revoke": "0xbd8b954cca50e651d1c678e99771dd684f0c74c8a974348b7946491c27f12190"
+  },
+  "outcomes": {
+    "delivered": 200,
+    "wrongSigner": 401,
+    "replay": 401,
+    "revoked": 403,
+    "tampered": 502
+  },
+  "tamperedAuthorization": "0xc005b3c7bc81c42bc94faecead018ca6b3365043cc7ea4e2511fe9b7f1586f13"
+}

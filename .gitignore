@@ -22,3 +22,4 @@ infrastructure/.runtime/
 infrastructure/.chain.lock
 smart-contract/deployments/*.pending.json
 smart-contract/deployments/*.lock
+/gateway/.runtime/

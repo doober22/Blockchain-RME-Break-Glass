@@ -19,6 +19,9 @@
     "chain:reset": "node infrastructure/chain.mjs reset",
     "chain:test": "node --test infrastructure/test/*.test.mjs",
     "chain:verify": "node infrastructure/verify.mjs",
+    "gateway:start": "node gateway/main.ts",
+    "gateway:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p gateway/tsconfig.json",
+    "gateway:test:besu": "node --test gateway/normal-consent.test.ts",
     "contracts:compile": "npm --prefix smart-contract run compile",
     "contracts:test": "npm --prefix smart-contract test",
     "contracts:deploy": "npm --prefix smart-contract run deploy:besu --"
