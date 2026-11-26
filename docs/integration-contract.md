@@ -21,7 +21,7 @@ Frontend hanya boleh menyalin manifest publik dan dua ABI ke build assets. Helpe
 
 ## Consent dan authorization normal (implemented; runtime gateway Planned)
 
-Controller source sekarang mengimplementasikan `registerRecord`, `deactivateRecord`, `grantConsent`, `revokeConsent`, `canRead`, dan `authorizeAccess`. Mode publik: `NORMAL_MODE() = 0`, `EMERGENCY_MODE() = 1`. `canRead` mengembalikan false untuk mode emergency sampai kebijakannya diimplementasikan. Manifest 1337 yang tersimpan masih deployment skeleton historis; ABI source terbaru harus dipasangkan dengan deployment baru yang diverifikasi, bukan diasumsikan cocok dengan address lama.
+Controller source sekarang mengimplementasikan `registerRecord`, `deactivateRecord`, `grantConsent`, `revokeConsent`, `canRead`, `authorizeAccess`, `requestEmergency`, `getRequestRecords`, dan `getEffectiveStatus`. Mode publik: `NORMAL_MODE() = 0`, `EMERGENCY_MODE() = 1`. `canRead` mengembalikan false untuk mode emergency sampai kebijakannya diimplementasikan. Manifest 1337 yang tersimpan masih deployment skeleton historis; ABI source terbaru harus dipasangkan dengan deployment baru yang diverifikasi, bukan diasumsikan cocok dengan address lama.
 
 Pasien pemilik record aktif memberi consent untuk satu dokter, satu record, dan expiry Unix seconds di masa depan. Keduanya harus eligible; fasilitas penerbit aktif. Consent normal boleh lintas fasilitas. Pasien asli dapat mencabut consent walaupun kredensial/role-nya sudah tidak aktif. Consent baru mempunyai ID baru; pencabutan tidak menghapus metadata lama.
 
@@ -32,10 +32,25 @@ Pasien pemilik record aktif memberi consent untuk satu dokter, satu record, dan 
 ## Oracle: event → API → transaksi (Planned)
 
 1. Dengarkan EmergencyRequested(requestId, patient, clinician, facilityId, requestHash, deadline) dari address tervalidasi pada chain 1337. Tunggu blok QBFT yang sudah dikomit dan receipt sukses; implementer harus menguji dukungan RPC finality/tag sebelum mengandalkannya.
-2. Baca getRequest(requestId), periksa exists, lalu ambil/validasi record scope melalui mekanisme yang disepakati Role 2. Getter metadata sekarang tersedia, tetapi mutasi request masih stub dan belum ada getter daftar record. Event tidak membawa encounter ID maupun record list.
+2. Baca `getRequest(requestId)`, periksa exists, lalu baca `getRequestRecords(requestId)` untuk scope maksimal 20 record. Pembuatan request pending, getter scope, hash request, serta effective pending expiry sudah diimplementasikan; resolution masih stub. Event tidak membawa encounter ID maupun record list, sehingga ambil keduanya dari getter. Getter scope/status menolak ID tidak dikenal dengan `RequestNotFound`.
 3. Query mock hospital API berdasarkan encounter dari sumber fasilitas tepercaya. API dikelola independen dari input dokter; jangan memakai URL bebas dari pemohon.
 4. Validasi schema, autentikasi, freshness, serta binding pasien, dokter, fasilitas, encounter, evidence commitment, request hash, chain ID, dan contract address. Request harus pending/belum deadline, kredensial aktif, dan semua indikator emergency yang diwajibkan benar.
 5. Kirim resolveEmergency(uint256 requestId, bool approved, bytes32 requestHash, uint64 observedAt, uint64 validUntil) melalui akun oracle berwenang, lalu periksa receipt final. Metode masih NotImplemented(); approval HTTP bukan grant on-chain.
+
+### Binding request yang sudah diimplementasikan
+
+Dokter dan pasien harus eligible saat request dibuat. Record IDs harus nonzero, strictly increasing menurut nilai numerik bytes32, unik, berjumlah 1–20, aktif, dan milik pasien; fasilitas penerbit aktif. Pemohon mengurutkan ID sebelum mengirim transaksi, tanpa mengubah scope yang dipilih. Durasi 1–900 detik; encounter/evidence commitment dan reason code wajib nonzero. Fasilitas pemohon diturunkan dari registry dokter. Request berstatus PENDING dan effective expiry mulai `block.timestamp >= decisionDeadline`, dengan deadline 120 detik sejak pembuatan. Tidak ada grant dari submission saja.
+
+Gunakan `hashEmergencyRequest` dari `smart-contract/integration/request-hash.ts`, utilitas viem tanpa signer/environment. Hash adalah `keccak256(abi.encode(binding))`, **satu tuple dinamis**, dengan schema tepat:
+
+```text
+(uint256 chainId, address controller, uint256 requestId,
+ address patient, address clinician, bytes32 requesterFacilityId,
+ bytes32 encounterId, bytes32[] recordIds, uint16 reasonCode,
+ bytes32 evidenceCommitment, uint64 requestedDuration, uint64 decisionDeadline)
+```
+
+Ambil chain ID/address dari deployment terverifikasi serta ID/deadline/field request/scope dari chain. Helper memakai bigint untuk integer selain reasonCode (number), memvalidasi batas/order, dan tidak melakukan sorting otomatis. Jangan memakai packed encoding, JSON hashing, atau daftar argumen flat. Vector tetap dan tes hash lintas bahasa tersedia; detail di [panduan kontrak](smart-contracts.md#pending-emergency-requests-and-request-binding). Hash attestation dan penerimaan keputusan oracle tetap pekerjaan Chunk 4. Hash request tidak membuktikan kebenaran fakta klinis.
 
 ### Mock endpoint proyek
 
@@ -57,7 +72,7 @@ GET /api/v1/encounters/{encounterId}/emergency-context adalah **rancangan mock A
 
 ### Persyaratan worker berikutnya
 
-Semua hal berikut masih Planned: runtime schema validation; authenticated API access dan transport aman di luar localhost; binding fasilitas; waktu bukan dari masa depan; usia/validity window maksimal 60 detik; request deadline 120 detik; serta canonical request/attestation encoding yang dikonfirmasi Role 2.
+Runtime worker masih Planned: schema validation response; authenticated API access dan transport aman di luar localhost; binding fasilitas; waktu bukan dari masa depan; usia/validity window maksimal 60 detik; serta penghentian retry sebelum request deadline. Canonical request encoding dan deadline on-chain sekarang tersedia seperti di atas; canonical attestation encoding dan validasi decision on-chain masih Chunk 4.
 
 Timeout, response rusak/usang, mismatch, atau sumber tidak terautentikasi tidak boleh menghasilkan approval. Retry harus terbatas oleh jumlah/waktu/deadline. Checkpoint dan idempotency memakai chain, contract, request, serta event identity; cek status on-chain sebelum retry setelah crash atau receipt tidak pasti. Kontrak tetap perlu menolak keputusan ganda.
 
@@ -65,6 +80,6 @@ Timeout, response rusak/usang, mismatch, atau sumber tidak terautentikasi tidak 
 
 **Role 1:** command lifecycle, onboarding, host/container RPC, reset recovery, dan hasil penerimaan tersedia pada [panduan chain](private-chain.md). Allowlists jaringan bukan role aplikasi.
 
-**Role 2:** selesaikan operasi medis controller, verifikasi request scope, dan canonical hashes. Registry, constructors/getter metadata, tests, signer, manifest schema, serta ABI exporter sekarang tersedia.
+**Role 2:** selesaikan resolution/authorization darurat, closure, review, dan canonical attestation hash. Registry, record lifecycle, consent/authorization normal, request pending, scope getter, canonical request hash, tests, signer, manifest schema, serta ABI exporter sekarang tersedia pada source. Deploy ulang terverifikasi masih diperlukan untuk source terbaru.
 
 **Role 3/implementer layanan:** integrasikan manifest schema baru, wallet/viem, worker dengan runtime validation/checkpoints, gateway, encrypted storage/key service, indexer/notifikasi, dan demo use-case. Semua komponen tersebut tetap Planned sampai implementasi serta pengujiannya tersedia.

@@ -2,7 +2,7 @@
 
 Solidity contracts, ABI exports, tests, and deployment tooling for the RME private chain.
 
-`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` implements record registration/deactivation, normal patient consent/revocation, and recorded normal-read authorization, referencing that registry. Emergency requests, decisions, closure, and review remain reverting stubs. The deployment tooling connects both contracts and exports their public interfaces for application services.
+`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` implements record registration/deactivation, normal patient consent/revocation, recorded normal-read authorization, and bounded pending emergency requests. Oracle decisions, emergency closure, and review remain reverting stubs; emergency reads remain denied. The deployment tooling connects both contracts and exports their public interfaces for application services.
 
 ## Toolchain
 
@@ -53,7 +53,10 @@ Records describe ownership, issuing facility, ciphertext hash, category, and act
 | `revokeConsent()` | Original patient irreversibly revokes an existing consent and emits `ConsentRevoked`. No current eligibility is required to remove access; repeated revocation is rejected. |
 | `canRead()` | Public view of current normal-read policy; false for unknown grants/records, wrong scope/identity/mode, revocation, expiry, inactive credentials, or inactive facilities. Emergency mode currently returns false. |
 | `authorizeAccess()` | Eligible issuing-facility gateway applies the same current policy, consumes a globally unique nonzero access ID, and emits `AccessAuthorized`. Rejected attempts revert without consuming the ID. |
-| `requestEmergency()`, `resolveEmergency()`, `closeEmergency()`, `submitReview()`, `getEffectiveStatus()`, `isReviewOverdue()` | Stubs; all revert with `NotImplemented()`. |
+| `requestEmergency()` | Eligible clinician creates a pending request for an eligible patient's 1–20 sorted unique active records, binding the encounter, reason, evidence commitment, duration, and 120-second deadline. |
+| `getRequestRecords()` | Returns the stored bounded scope; unknown request IDs revert with `RequestNotFound`. |
+| `getEffectiveStatus()` | Returns the effective status of an existing request, computing expiry at the pending deadline or active expiry. Unknown IDs revert. Only pending requests can currently be created. |
+| `resolveEmergency()`, `closeEmergency()`, `submitReview()`, `isReviewOverdue()` | Stubs; all revert with `NotImplemented()`. |
 
 The metadata getters return `exists=false` for unknown IDs. Callers must inspect that flag rather than treating default field values as a valid entry. The constructor checks that the registry address contains code; the deployment workflow additionally verifies the expected registry bytecode and controller reference.
 
@@ -79,9 +82,36 @@ The original patient can revoke after patient role removal, credential expiry, r
 
 Additional errors: `InactiveFacility(facilityId)`, `NotRecordOwner(recordId, account)`, `InvalidConsentExpiry(expiresAt)`, `ConsentNotFound(consentId)`, `NotConsentOwner(consentId, account)`, `ConsentAlreadyRevoked(consentId)`, `InvalidAccessId()`, `AccessIdAlreadyUsed(accessId)`, and `ReadAccessDenied()`. Clients may use `canRead` for a current allow/deny result; detailed UI diagnosis must also read current consent/record/registry metadata. Transaction authorization reports generic `ReadAccessDenied` after gateway/access-ID validation when the shared policy fails.
 
-Stored request statuses are `PENDING`, `REJECTED`, `ACTIVE`, and `CLOSED`. A separate effective-status enum includes `EXPIRED`. The request-record array and membership mapping reserve emergency record scope, while `usedAccessIds` now enforces replay protection for normal-read authorizations. The remaining stubs cannot create or activate emergency grants.
+### Pending emergency requests and request binding
 
-Policy constants: **15 minutes** emergency duration, **60 seconds** attestation age, **120 seconds** request TTL, **20 records** per request, and **24 hours** review target. These are prototype parameters; their enforcement belongs to the stubbed operations.
+The requesting clinician and patient must both be currently eligible. The requesting facility is derived from the clinician's registry entry, while records may come from multiple active issuing facilities. Every record must exist, be active, and belong to that patient. As with record registration, requiring patient eligibility makes the design's registered-patient requirement explicit and stricter: inactive, expired, or role-revoked patients cannot be used to create new requests.
+
+Record IDs must be nonzero and strictly ascending by their numeric bytes32 value; duplicate or unordered input is rejected, never silently sorted. Scope contains 1–20 records and cannot be changed after creation. Encounter ID and evidence commitment are nonzero bytes32, reason is a nonzero uint16, and requested duration is 1–900 seconds. These checks validate request structure, not whether an emergency is clinically true. A nonzero reason code is not a clinical assessment or oracle approval.
+
+Each successful request receives a fresh increasing ID. Repeated equivalent requests are separate requests with separate hashes; submission alone never activates access. Invalid requests leave no metadata/scope and do not consume an ID. `createdAt` is block time and `decisionDeadline = createdAt + 120`. A timestamp that would overflow the uint64 deadline is rejected. Activation, grant expiry, and attestation fields remain zero.
+
+Stored request statuses are `PENDING=0`, `REJECTED=1`, `ACTIVE=2`, and `CLOSED=3`. Effective status additionally includes `EXPIRED=4`. Pending requests become effectively expired at `block.timestamp >= decisionDeadline` without a cleanup transaction or expiry event; stored status and historical fields remain unchanged. Effective status describes lifecycle/time, not current credential eligibility. The helper includes active-expiry and terminal-state handling for later resolution/closure implementation, but those states are not reachable through current business methods.
+
+The array returned by `getRequestRecords` is bounded by 20; the contract also stores membership for future constant-time emergency reads. `getRequest` retains `exists=false` behavior for unknown IDs, while scope/effective-status queries reject unknown IDs. No global history enumeration is added.
+
+Request hash is **keccak256 of `abi.encode(binding)`**, where `binding` is one dynamic tuple in this exact order:
+
+```text
+(uint256 chainId, address controller, uint256 requestId,
+ address patient, address clinician, bytes32 requesterFacilityId,
+ bytes32 encounterId, bytes32[] recordIds, uint16 reasonCode,
+ bytes32 evidenceCommitment, uint64 requestedDuration, uint64 decisionDeadline)
+```
+
+This is a single tuple argument, including its ABI dynamic offset, not flattened arguments, packed encoding, JSON hashing, or EIP-712. All fields above are bound. The ordered record list is included directly. Chain ID and controller address prevent reuse across domains. Hashes do not change when credentials/facilities change or time passes; future approval must separately recheck current eligibility.
+
+`smart-contract/integration/request-hash.ts` exports `hashEmergencyRequest`, `RequestHashInput`, and `requestHashParameters`. It is a pure viem utility without environment/signers. Integer IDs/times/duration use bigint, reason code uses a number, addresses use EVM address strings, and IDs/commitments use bytes32 hex strings. It validates widths/nonzero fields/bounds/order and never mutates input. Consumers must load the actual on-chain request and scope before recomputing; they must not infer the assigned request ID or block-derived deadline from form input.
+
+Fixed reference vectors in both Solidity and TypeScript tests use chain 1337; controller/patient/clinician addresses consisting of repeated bytes `11`/`22`/`33`; facility/encounter/evidence bytes32 consisting of repeated bytes `44`/`55`/`66`; request ID 1; reason 7; duration 900; deadline 1120. With the single record ID uint256(10) encoded as bytes32, hash is `0xbe75b384e22e59d38aea2d92d001f77e6543045d2d21fa53c701828595aa8652`. With IDs 10 through 29 inclusive, hash is `0x7b5057334a9afe14d62740bb842110d11c6ad6295c295b51b88577a654024239`.
+
+Request-specific errors: `InvalidRecordCount(count)`, `InvalidRecordOrder(previous, current)`, `RecordPatientMismatch(recordId, expected, actual)`, `InvalidEncounterId()`, `InvalidReasonCode()`, `InvalidEvidenceCommitment()`, `InvalidEmergencyDuration(duration)`, `InvalidRequestTimestamp()`, and `RequestNotFound(requestId)`, in addition to shared eligibility/record/facility errors.
+
+Policy constants: **15 minutes** emergency duration, **60 seconds** attestation age, **120 seconds** request TTL, **20 records** per request, and **24 hours** review target. Request duration bounds, TTL, and scope bounds are enforced. Attestation validation, activation-based grant lifetime, and review timing still await their respective chunks. These are prototype parameters, not clinical standards.
 
 ## Commands
 
@@ -100,6 +130,7 @@ npm test
 | `npm test` | Compile, type-check, and run contract/deployment tests. |
 | `npm run test:contracts` | Run Solidity tests on Hardhat. |
 | `npm run test:deployment` | Test deployment, verification, reuse, and recovery on disposable Hardhat EVMs. |
+| `npm run test:integration` | Check fixed request-hash vectors, field/domain sensitivity, encoder validation, and signed pending-request scope/event/deadline behavior. |
 | `npm run export:abi` | Export ABIs from existing build artifacts. |
 | `npm run deployer:address` | Print the configured deployer's public address. |
 | `npm run deploy:besu` | Compile, deploy or verify/reuse contracts, and write public deployment metadata. |
@@ -170,6 +201,16 @@ Normal-consent verification on **26 November 2026**: compile/ABI export and Type
 | Contract side of FR-10/FR-12, NFR-03: issuer gateway and audit/replay | `testOnlyIssuingGatewayCanAuthorizeDespitePublicReadQuery`, `testAuthorizationEmitsCompleteAuditPayloadAndAllowsDistinctReads`, `testZeroAndReplayedAccessIdsAreRejectedGlobally`, `testDeniedAuthorizationDoesNotConsumeAccessId` | Passed; shared policy, nonzero global IDs, complete event, fail-closed transactions |
 | NFR-06: exclusive expiry | `testFuzzConsentExpiryQueryAndAuthorizationAgree` | Passed; queries and transactions allow before expiry and deny exactly at/after expiry across 256 generated cases |
 
-The public ABI has been regenerated. The existing `deployments/1337.json` still describes the historical skeleton deployment; this changed controller has **not** been deployed to Besu during Chunks 1–2. Deployment verification will reject reuse against changed artifacts. Explicit deployment/reverification belongs to the contract-release chunk; no ledger reset or existing deployment replacement was performed here.
+Emergency-request verification on **26 November 2026**: `npm --prefix smart-contract test` passed compile/ABI export, TypeScript, **76 Solidity tests**, **9 deployment/integration tests**, and **5 request-hash/integration tests**. The 17 new Solidity tests include 256 pending-expiry fuzz cases and fixed single-/20-record hash vectors. Signed TypeScript scenarios compare actual stored hashes and event payloads to the helper for 1- and 20-record requests, inspect bounded scope, and check status before, at, and after the deadline. Field/domain sensitivity covers every hash field. Four emergency-resolution/closure/review methods remain explicit reverting stubs.
+
+| Requirement | Chunk 3 evidence | Observed result |
+| --- | --- | --- |
+| FR-05: eligible requesting clinician, patient, immutable request data | `EmergencyRequest.t.sol`: `testRequestStoresScopeMetadataAndEmitsPendingEventWithoutConsent`, `testOnlyEligibleCliniciansCanRequest`, credential/patient denial tests | Passed; requesting facility comes from registry, request starts pending with zero activation fields |
+| FR-05 / NFR-08: bounded canonical record scope | `testTwentySortedRecordsAcrossFacilitiesAreAccepted`, `testRejectsEmptyAndOversizedScope`, `testRejectsZeroDuplicateAndDescendingIdsWithoutSilentSorting`, invalid-record/partial-scope tests | Passed; 1–20 records, cross-facility records supported, invalid requests do not consume IDs |
+| FR-05 / FR-07 prerequisite: submission does not grant access | `testPendingRequestNeverAuthorizesEmergencyReadsOrChangesConsent` | Passed; existing normal consent is independent and emergency reads remain denied |
+| NFR-06: exclusive pending deadline | `testFuzzPendingExpiryBoundary`, `testDeadlineUint64OverflowIsRejectedWithoutWrapping`; signed TypeScript deadline checks | Passed; exact boundary and no cleanup transaction; stored pending history retained |
+| NFR-07 prerequisite: request and domain binding | `testFixedSingleAndTwentyRecordHashVectors`; `test/request-hash.test.ts` fixed vectors, every-field sensitivity, signed on-chain hash comparison | Passed; same single-tuple encoding across Solidity/TypeScript and domain-sensitive hashes |
+
+The public ABI has been regenerated. The existing `deployments/1337.json` still describes the historical skeleton deployment; this changed controller has **not** been deployed to Besu during Chunks 1–3. Deployment verification will reject reuse against changed artifacts. Explicit deployment/reverification belongs to the contract-release chunk; no ledger reset or existing deployment replacement was performed here.
 
 FR-11's ciphertext hash metadata is available, but actual integrity checking remains a future gateway task. These results establish normal contract authorization, not break-glass, medical-data delivery, complete confidentiality, or application latency.

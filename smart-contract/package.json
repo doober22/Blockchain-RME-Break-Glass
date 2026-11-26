@@ -8,9 +8,10 @@
     "compile": "hardhat compile && node scripts/export-abi.ts",
     "export:abi": "node scripts/export-abi.ts",
     "typecheck": "tsc --noEmit",
-    "test": "npm run compile && npm run typecheck && npm run test:contracts && npm run test:deployment",
+    "test": "npm run compile && npm run typecheck && npm run test:contracts && npm run test:deployment && npm run test:integration",
     "test:contracts": "hardhat test solidity",
     "test:deployment": "node --test test/deployment.test.ts",
+    "test:integration": "node --test test/request-hash.test.ts",
     "deploy:besu": "npm run compile && node scripts/deploy-besu.ts",
     "deployer:address": "node scripts/deployer-address.ts"
   },

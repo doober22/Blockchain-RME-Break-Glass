@@ -63,6 +63,22 @@ contract MedicalAccessController {
         uint64 reviewedAt;
     }
 
+    /// @dev Canonical single-tuple ABI encoding, shared with integration/request-hash.ts.
+    struct EmergencyRequestBinding {
+        uint256 chainId;
+        address controller;
+        uint256 requestId;
+        address patient;
+        address clinician;
+        bytes32 requesterFacilityId;
+        bytes32 encounterId;
+        bytes32[] recordIds;
+        uint16 reasonCode;
+        bytes32 evidenceCommitment;
+        uint64 requestedDuration;
+        uint64 decisionDeadline;
+    }
+
     mapping(bytes32 => MedicalRecord) private records;
     mapping(uint256 => Consent) private consents;
     mapping(uint256 => EmergencyRequest) private emergencyRequests;
@@ -92,6 +108,15 @@ contract MedicalAccessController {
     error InvalidAccessId();
     error AccessIdAlreadyUsed(bytes32 accessId);
     error ReadAccessDenied();
+    error InvalidRecordCount(uint256 count);
+    error InvalidRecordOrder(bytes32 previous, bytes32 current);
+    error RecordPatientMismatch(bytes32 recordId, address expected, address actual);
+    error InvalidEncounterId();
+    error InvalidReasonCode();
+    error InvalidEvidenceCommitment();
+    error InvalidEmergencyDuration(uint64 duration);
+    error InvalidRequestTimestamp();
+    error RequestNotFound(uint256 requestId);
 
     event RecordRegistered(
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId,
@@ -207,8 +232,42 @@ contract MedicalAccessController {
     function requestEmergency(
         address patient, bytes32[] calldata recordIds, bytes32 encounterId,
         uint16 reasonCode, bytes32 evidenceCommitment, uint64 duration
-    ) external pure returns (uint256 requestId) {
-        revert NotImplemented();
+    ) external returns (uint256 requestId) {
+        ParticipantRegistry.Participant memory clinician = _requireEligible(msg.sender, registry.CLINICIAN_ROLE());
+        _requireEligible(patient, registry.PATIENT_ROLE());
+        if (recordIds.length == 0 || recordIds.length > MAX_RECORDS) revert InvalidRecordCount(recordIds.length);
+        if (encounterId == bytes32(0)) revert InvalidEncounterId();
+        if (reasonCode == 0) revert InvalidReasonCode();
+        if (evidenceCommitment == bytes32(0)) revert InvalidEvidenceCommitment();
+        if (duration == 0 || duration > MAX_EMERGENCY_DURATION) revert InvalidEmergencyDuration(duration);
+        if (block.timestamp > type(uint64).max - REQUEST_TTL) revert InvalidRequestTimestamp();
+
+        for (uint256 i; i < recordIds.length; ++i) {
+            if (recordIds[i] == bytes32(0)) revert InvalidRecordId();
+            if (i > 0 && recordIds[i] <= recordIds[i - 1]) revert InvalidRecordOrder(recordIds[i - 1], recordIds[i]);
+            MedicalRecord storage record = _requireActiveRecord(recordIds[i]);
+            if (record.patient != patient) revert RecordPatientMismatch(recordIds[i], patient, record.patient);
+        }
+
+        requestId = ++requestCounter;
+        EmergencyRequest storage request = emergencyRequests[requestId];
+        request.exists = true;
+        request.patient = patient;
+        request.clinician = msg.sender;
+        request.requesterFacilityId = clinician.facilityId;
+        request.encounterId = encounterId;
+        request.reasonCode = reasonCode;
+        request.evidenceCommitment = evidenceCommitment;
+        request.requestedDuration = duration;
+        request.createdAt = uint64(block.timestamp);
+        request.decisionDeadline = uint64(block.timestamp) + REQUEST_TTL;
+        request.status = RequestStatus.PENDING;
+        for (uint256 i; i < recordIds.length; ++i) {
+            requestRecords[requestId].push(recordIds[i]);
+            recordIncluded[requestId][recordIds[i]] = true;
+        }
+        request.requestHash = _hashRequest(requestId, request, recordIds);
+        emit EmergencyRequested(requestId, patient, msg.sender, clinician.facilityId, request.requestHash, request.decisionDeadline);
     }
 
     function resolveEmergency(
@@ -225,12 +284,20 @@ contract MedicalAccessController {
         revert NotImplemented();
     }
 
-    function getEffectiveStatus(uint256 requestId) external pure returns (EffectiveStatus) {
-        revert NotImplemented();
+    function getEffectiveStatus(uint256 requestId) external view returns (EffectiveStatus) {
+        EmergencyRequest storage request = _requireRequest(requestId);
+        if (request.status == RequestStatus.PENDING && block.timestamp >= request.decisionDeadline) return EffectiveStatus.EXPIRED;
+        if (request.status == RequestStatus.ACTIVE && block.timestamp >= request.expiresAt) return EffectiveStatus.EXPIRED;
+        return EffectiveStatus(uint8(request.status));
     }
 
     function getRequest(uint256 requestId) external view returns (EmergencyRequest memory) {
         return emergencyRequests[requestId];
+    }
+
+    function getRequestRecords(uint256 requestId) external view returns (bytes32[] memory) {
+        _requireRequest(requestId);
+        return requestRecords[requestId];
     }
 
     function getConsent(uint256 consentId) external view returns (Consent memory) {
@@ -254,6 +321,30 @@ contract MedicalAccessController {
     {
         if (!registry.isEligible(account, role)) revert IneligibleParticipant(account, role);
         return registry.getParticipant(account);
+    }
+
+    function _requireRequest(uint256 requestId) internal view returns (EmergencyRequest storage request) {
+        request = emergencyRequests[requestId];
+        if (!request.exists) revert RequestNotFound(requestId);
+    }
+
+    function _hashRequest(uint256 requestId, EmergencyRequest storage request, bytes32[] calldata recordIds)
+        internal view returns (bytes32)
+    {
+        EmergencyRequestBinding memory binding;
+        binding.chainId = block.chainid;
+        binding.controller = address(this);
+        binding.requestId = requestId;
+        binding.patient = request.patient;
+        binding.clinician = request.clinician;
+        binding.requesterFacilityId = request.requesterFacilityId;
+        binding.encounterId = request.encounterId;
+        binding.recordIds = recordIds;
+        binding.reasonCode = request.reasonCode;
+        binding.evidenceCommitment = request.evidenceCommitment;
+        binding.requestedDuration = request.requestedDuration;
+        binding.decisionDeadline = request.decisionDeadline;
+        return keccak256(abi.encode(binding));
     }
 
     function _requireRecord(bytes32 recordId) internal view returns (MedicalRecord storage record) {

@@ -92,13 +92,71 @@
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "uint64",
+        "name": "duration",
+        "type": "uint64"
+      }
+    ],
+    "name": "InvalidEmergencyDuration",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidEncounterId",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidEvidenceCommitment",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidReasonCode",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "count",
+        "type": "uint256"
+      }
+    ],
+    "name": "InvalidRecordCount",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidRecordId",
     "type": "error"
   },
   {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "previous",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "current",
+        "type": "bytes32"
+      }
+    ],
+    "name": "InvalidRecordOrder",
+    "type": "error"
+  },
+  {
     "inputs": [],
     "name": "InvalidRegistry",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "InvalidRequestTimestamp",
     "type": "error"
   },
   {
@@ -174,6 +232,38 @@
       }
     ],
     "name": "RecordNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "recordId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "expected",
+        "type": "address"
+      },
+      {
+        "internalType": "address",
+        "name": "actual",
+        "type": "address"
+      }
+    ],
+    "name": "RecordPatientMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RequestNotFound",
     "type": "error"
   },
   {
@@ -786,7 +876,7 @@
         "type": "uint8"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -931,6 +1021,25 @@
         "internalType": "struct MedicalAccessController.EmergencyRequest",
         "name": "",
         "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getRequestRecords",
+    "outputs": [
+      {
+        "internalType": "bytes32[]",
+        "name": "",
+        "type": "bytes32[]"
       }
     ],
     "stateMutability": "view",
@@ -1112,7 +1221,7 @@
         "type": "uint256"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
