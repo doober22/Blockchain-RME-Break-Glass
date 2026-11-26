@@ -1,19 +1,19 @@
 {
   "schemaVersion": 1,
   "chainId": 1337,
-  "genesisHash": "0xf65b4c9cff8d571f35801f0b2ff04b78ab49a840323a1b51873af4e3944f4f2c",
-  "deployer": "0xE6FEd275E99D79c819E0237e8EFA799E77D8903E",
-  "initialAdmin": "0xE6FEd275E99D79c819E0237e8EFA799E77D8903E",
+  "genesisHash": "0x0d24e07511cb3aebb080bc5a9cb88ecc456fa6168c9a606c69a704c5491e33c7",
+  "deployer": "0x9B214a64C13f35ac289876fFCCBAB87c41f3f6e3",
+  "initialAdmin": "0x9B214a64C13f35ac289876fFCCBAB87c41f3f6e3",
   "artifactHashes": {
     "ParticipantRegistry": "0x100308ec0eb9de70ee9fea4f0373252cc8fe509eba9aa13b8080e63614f7e58c",
-    "MedicalAccessController": "0x274051660f101812a12626f547b4dc0dabd8897246f80654e40bf24eec5f98c2"
+    "MedicalAccessController": "0x555949b2cb9674d52a0104e40a2a0f6fac3a07cc9c6c0011b6380496968fcd75"
   },
   "contracts": {
-    "ParticipantRegistry": "0xd3774198f93dea32c312571aa10a3044a4852586",
-    "MedicalAccessController": "0x8c8690e0bbaae7934360f939e5c24c966a7e26b4"
+    "ParticipantRegistry": "0xb8e68574ba3466faed04426ae57ffb7109c3bce9",
+    "MedicalAccessController": "0x97e71d7a2de8d3a499876a2f7eb913eecb9a8db4"
   },
   "deploymentTransactions": {
-    "ParticipantRegistry": "0x4d9168ffe853ad8dde4aaf9c760fd2ae9e7f9eb51397952bd8f05e7537f41d6f",
-    "MedicalAccessController": "0x42570585b867cb1a11cdcc250620f16faf032e70376ee87c670f4b0b907df8a9"
+    "ParticipantRegistry": "0x68aa655747341d556f34d51ab06362ffe655420d2aad513043e93742eeaf0faa",
+    "MedicalAccessController": "0xbd769dd1744123659c80c66b5c53de0468c406ff9ce11920958b3517a2db912a"
   }
 }

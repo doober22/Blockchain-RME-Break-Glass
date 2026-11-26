@@ -13,6 +13,7 @@
     "test:deployment": "node --test test/deployment.test.ts",
     "test:integration": "node --test test/request-hash.test.ts test/attestation-hash.test.ts",
     "deploy:besu": "npm run compile && node scripts/deploy-besu.ts",
+    "verify:besu": "npm run compile && node scripts/verify-besu.ts",
     "deployer:address": "node scripts/deployer-address.ts"
   },
   "engines": {

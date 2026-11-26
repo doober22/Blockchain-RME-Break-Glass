@@ -1,0 +1,318 @@
+{
+  "environment": {
+    "chainId": 1337,
+    "client": "besu/v26.11.0/linux-x86_64/openjdk-java-25",
+    "node": "v24.14.0",
+    "platform": "win32",
+    "compiler": "0.8.28",
+    "evmTarget": "paris",
+    "optimizerRuns": 200
+  },
+  "deployment": {
+    "schemaVersion": 1,
+    "chainId": 1337,
+    "genesisHash": "0x0d24e07511cb3aebb080bc5a9cb88ecc456fa6168c9a606c69a704c5491e33c7",
+    "deployer": "0x9B214a64C13f35ac289876fFCCBAB87c41f3f6e3",
+    "initialAdmin": "0x9B214a64C13f35ac289876fFCCBAB87c41f3f6e3",
+    "artifactHashes": {
+      "ParticipantRegistry": "0x100308ec0eb9de70ee9fea4f0373252cc8fe509eba9aa13b8080e63614f7e58c",
+      "MedicalAccessController": "0x555949b2cb9674d52a0104e40a2a0f6fac3a07cc9c6c0011b6380496968fcd75"
+    },
+    "contracts": {
+      "ParticipantRegistry": "0xb8e68574ba3466faed04426ae57ffb7109c3bce9",
+      "MedicalAccessController": "0x97e71d7a2de8d3a499876a2f7eb913eecb9a8db4"
+    },
+    "deploymentTransactions": {
+      "ParticipantRegistry": "0x68aa655747341d556f34d51ab06362ffe655420d2aad513043e93742eeaf0faa",
+      "MedicalAccessController": "0xbd769dd1744123659c80c66b5c53de0468c406ff9ce11920958b3517a2db912a"
+    }
+  },
+  "runtimeBytes": {
+    "ParticipantRegistry": 4755,
+    "MedicalAccessController": 13600
+  },
+  "receipts": {
+    "deploy.ParticipantRegistry": {
+      "hash": "0x68aa655747341d556f34d51ab06362ffe655420d2aad513043e93742eeaf0faa",
+      "block": "29",
+      "gas": "1128322",
+      "status": "success"
+    },
+    "deploy.MedicalAccessController": {
+      "hash": "0xbd769dd1744123659c80c66b5c53de0468c406ff9ce11920958b3517a2db912a",
+      "block": "31",
+      "gas": "2990906",
+      "status": "success"
+    },
+    "register.issuer": {
+      "hash": "0x211fd8aac9aec7439bf25cea2f0f9a425e2f9990853b3216ad3dd812af5d25e9",
+      "block": "90",
+      "gas": "48286",
+      "status": "success"
+    },
+    "register.requester": {
+      "hash": "0x7344f451aadbe15d1b47dfba29c116a7443de343e62869dab6cc7c6a6ec39635",
+      "block": "92",
+      "gas": "48274",
+      "status": "success"
+    },
+    "register.PATIENT": {
+      "hash": "0xe35e17ef2a638dd454551473bb228cc4c29f06a1002ca6b6ed6cc16bce7e4e48",
+      "block": "93",
+      "gas": "124107",
+      "status": "success"
+    },
+    "register.CLINICIAN": {
+      "hash": "0x6e8d397f48830cbccf5bc9ac33d7d81c0b57ad904008e2b1d794bbc3be27c4af",
+      "block": "95",
+      "gas": "128714",
+      "status": "success"
+    },
+    "register.GATEWAY": {
+      "hash": "0x2f5029c3ef673dcd3a17a281017b81f16c878d22f8907f70f90fdd1e25678745",
+      "block": "97",
+      "gas": "126722",
+      "status": "success"
+    },
+    "register.ORACLE": {
+      "hash": "0xf3200a77de3d08e4ccb663b638378008ff7506d9e238052f0a48b736154b79cc",
+      "block": "99",
+      "gas": "126526",
+      "status": "success"
+    },
+    "register.AUDITOR": {
+      "hash": "0xd6e8baeb14c2c5e27bf0ae3b690ff5a64b72c81705eb46dc9812fc1524ced473",
+      "block": "101",
+      "gas": "124217",
+      "status": "success"
+    },
+    "record.0": {
+      "hash": "0x3ccc1b0b32897ac84d74bc8cd3fc62fb73582dcf04897e3ce7997b2f9cab0406",
+      "block": "103",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.1": {
+      "hash": "0x481dfc286decdbbc0e3eb8f2d671ec26865346a49ca3c44a91f5b4fef028f0d9",
+      "block": "105",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.2": {
+      "hash": "0x649f783c08ff4c4554d1a60a3afabf487bda26af8c5c8fe5bf4d72558c0c9a54",
+      "block": "106",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.3": {
+      "hash": "0x600625a1e80d3b01769a1f0a5b0d9be6823d3db792703607a35eae4202ccf232",
+      "block": "108",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.4": {
+      "hash": "0x513b83dca7245c6aaf5bcd38cfa0ad0e5a0df5de663b6fcfe101ce15f784db86",
+      "block": "110",
+      "gas": "146136",
+      "status": "success"
+    },
+    "record.5": {
+      "hash": "0xfc895c6ee2c940ae085b3da0a5206b73ac7795d479ec84a7bd8fde137a8a22b6",
+      "block": "112",
+      "gas": "146124",
+      "status": "success"
+    },
+    "record.6": {
+      "hash": "0x19080e111990feacf0450598a8ce83f408e4f4520bdfb6ae2b19e8103e479e42",
+      "block": "114",
+      "gas": "146136",
+      "status": "success"
+    },
+    "record.7": {
+      "hash": "0xb8c184d816c753c86ebceeb42614dcebc01d650c85383e0f8b61528b8f6f8b3c",
+      "block": "116",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.8": {
+      "hash": "0xa466d9f458be0b3be406d6e6d111785862343b8a6b5624f403c7ad670f772063",
+      "block": "118",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.9": {
+      "hash": "0x97431ba31401a5e58e628f6b6cd8b765ce2e00525360b5e3479de3444132c0a1",
+      "block": "120",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.10": {
+      "hash": "0x221faf4054c9dcc7a73b42199e09e38d5a72e4d0d9e549e425411cd039b18e99",
+      "block": "121",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.11": {
+      "hash": "0x9f748fa195b3205bdf27e8f20f16ffb9d031d8e8069a88667c010b5e1a95015c",
+      "block": "123",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.12": {
+      "hash": "0xfa99ec707dab67c6f76b0cf9d1da8bf22b5ee29313fffccfa2faa1adab64621e",
+      "block": "125",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.13": {
+      "hash": "0x20016d7c6d08d2afd6af7514730b9da93a1a71252d969fdf3dca36b859ce3fd4",
+      "block": "127",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.14": {
+      "hash": "0x8ac0686ce254e3086ac403ab461823f26209a43ef19ef4ad655a47ff0c40b0af",
+      "block": "129",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.15": {
+      "hash": "0x20211b5f1eeaf8ded42ede1e71d2187db97072f0867ffa34295bee287656f584",
+      "block": "130",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.16": {
+      "hash": "0x5577bf8f26aafbf24331b08a81af9834d3ef03b73d79a9a312e52951a8ac80a6",
+      "block": "132",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.17": {
+      "hash": "0x1a427f64ce5c29f6663c6afd8fb7bb8ffaf87d17b2b3d8e2da47e4bd3adb8e4c",
+      "block": "134",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.18": {
+      "hash": "0x6c666690908f82fb83c3a6b42c73e381bd12a0db85a6660c298a9495dbe08ad1",
+      "block": "136",
+      "gas": "146148",
+      "status": "success"
+    },
+    "record.19": {
+      "hash": "0x9bc3a7b2f83126544e1a6c4ce2423630aa2185f1b1b19a43788d973220586723",
+      "block": "138",
+      "gas": "146148",
+      "status": "success"
+    },
+    "consent.grant": {
+      "hash": "0x4a16d702693031480cfd6875ac331aed3eae20f2d12d67baa698b18afb3d71b7",
+      "block": "140",
+      "gas": "177406",
+      "status": "success"
+    },
+    "consent.authorize": {
+      "hash": "0xf95b3e77ef9b988fae05a888adf6ce1917a7a717330a137dd7c659ca152e1e80",
+      "block": "142",
+      "gas": "109066",
+      "status": "success"
+    },
+    "consent.revoke": {
+      "hash": "0xda3665f62c50ef13ba0d1ca2bee03a80d4bf74be5fbdd14703bd1b8a5b0146f2",
+      "block": "143",
+      "gas": "35564",
+      "status": "success"
+    },
+    "consent.deniedAfterRevocation": {
+      "hash": "0xff350aa60da6e282c370123c01b6a0be73764328eb28b35737e811e308e671ea",
+      "block": "145",
+      "gas": "54862",
+      "status": "reverted"
+    },
+    "emergency.request.1": {
+      "hash": "0x906e39ef8e277c17034f1a73969acded79e5c2cb7ae25fb126d435649c346722",
+      "block": "147",
+      "gas": "340135",
+      "status": "success"
+    },
+    "emergency.deniedPending": {
+      "hash": "0x3273d596d90d984fb726b9063c006eed70c4158e678a1d482d2be792d66dcee5",
+      "block": "149",
+      "gas": "54947",
+      "status": "reverted"
+    },
+    "emergency.resolve.1": {
+      "hash": "0x3334759a07262cb2b0b9f6afc96b9fea08506036efae08e55896fc53aa429454",
+      "block": "151",
+      "gas": "144780",
+      "status": "success"
+    },
+    "emergency.authorize": {
+      "hash": "0xcfa2c8bf21c855c2bd9ba7c3c81aa48aa0f04d2957f5ef309b02c42f3518eecd",
+      "block": "153",
+      "gas": "113341",
+      "status": "success"
+    },
+    "emergency.close": {
+      "hash": "0x524f5af7a840765f140ecfc599a9e4034bcb6516e8741e023505661c24247fc3",
+      "block": "155",
+      "gas": "31550",
+      "status": "success"
+    },
+    "emergency.deniedAfterClosure": {
+      "hash": "0x287d24e2cef45a170b07c19af3a106335fe1157afa5b7735bc203dbfc29c9c21",
+      "block": "156",
+      "gas": "54947",
+      "status": "reverted"
+    },
+    "emergency.request.2": {
+      "hash": "0x8e4754c2f2445dee25b64e8d5399f47ecb93616938607b4a9499da24a8dc931c",
+      "block": "158",
+      "gas": "1347547",
+      "status": "success"
+    },
+    "emergency.resolve.2": {
+      "hash": "0x21d0c85620866b24c236016623f188db78b68d81515d7a82431899f7ffa38d95",
+      "block": "160",
+      "gas": "345203",
+      "status": "success"
+    },
+    "emergency.misuseReview": {
+      "hash": "0x2d984a0ff0ac359d4db73c7ae4470d47f2b81bac8a4b7989c8e839facb5fa48f",
+      "block": "162",
+      "gas": "119690",
+      "status": "success"
+    },
+    "emergency.deniedAfterMisuse": {
+      "hash": "0xfa622e612c73b1c5e453ce8c4c144c9d8e31a230e5f317b9c3c1867f2b54011a",
+      "block": "164",
+      "gas": "54947",
+      "status": "reverted"
+    },
+    "emergency.request.3": {
+      "hash": "0x195572b90486a161b8b3d33f751cb8afbe6adbda278d750cb5d41d19d6401c8b",
+      "block": "166",
+      "gas": "323035",
+      "status": "success"
+    },
+    "emergency.resolve.3": {
+      "hash": "0x1649842a292a7fdb04e446509cc7410c6562359c32b3b0cdfbed7ee02c0362be",
+      "block": "168",
+      "gas": "97590",
+      "status": "success"
+    },
+    "emergency.deniedAfterRejection": {
+      "hash": "0x53a5c3febb2cacdf8414c9b4e7bb6a9af34dead4413fd5659c9aa9528ea0766f",
+      "block": "170",
+      "gas": "54947",
+      "status": "reverted"
+    },
+    "record.deactivate": {
+      "hash": "0x76a0d362798d0c1556b10d8d39a7f5f138ddce18fd2cc787042155596d697a43",
+      "block": "171",
+      "gas": "51583",
+      "status": "success"
+    }
+  }
+}
