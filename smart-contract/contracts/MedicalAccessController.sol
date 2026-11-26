@@ -117,6 +117,10 @@ contract MedicalAccessController {
     error InvalidEmergencyDuration(uint64 duration);
     error InvalidRequestTimestamp();
     error RequestNotFound(uint256 requestId);
+    error RequestNotPending(uint256 requestId);
+    error RequestDeadlinePassed(uint256 requestId);
+    error RequestHashMismatch(uint256 requestId);
+    error InvalidAttestationTimestamps();
 
     event RecordRegistered(
         bytes32 indexed recordId, address indexed patient, bytes32 indexed facilityId,
@@ -272,8 +276,40 @@ contract MedicalAccessController {
 
     function resolveEmergency(
         uint256 requestId, bool approved, bytes32 requestHash, uint64 observedAt, uint64 validUntil
-    ) external pure {
-        revert NotImplemented();
+    ) external {
+        EmergencyRequest storage request = _requireRequest(requestId);
+        ParticipantRegistry.Participant memory oracle = _requireEligible(msg.sender, registry.ORACLE_ROLE());
+        if (oracle.facilityId != request.requesterFacilityId) revert WrongFacility(request.requesterFacilityId, oracle.facilityId);
+        if (request.status != RequestStatus.PENDING) revert RequestNotPending(requestId);
+        if (block.timestamp >= request.decisionDeadline) revert RequestDeadlinePassed(requestId);
+        if (requestHash != request.requestHash) revert RequestHashMismatch(requestId);
+        // Check ordering before subtraction: malformed timestamps must never underflow.
+        if (
+            observedAt > block.timestamp || validUntil <= observedAt || block.timestamp >= validUntil
+            || block.timestamp - observedAt > MAX_ATTESTATION_AGE
+            || validUntil - observedAt > MAX_ATTESTATION_AGE
+        ) revert InvalidAttestationTimestamps();
+
+        if (approved) {
+            ParticipantRegistry.Participant memory clinician = _requireEligible(request.clinician, registry.CLINICIAN_ROLE());
+            if (clinician.facilityId != request.requesterFacilityId) revert WrongFacility(request.requesterFacilityId, clinician.facilityId);
+            _requireEligible(request.patient, registry.PATIENT_ROLE());
+            bytes32[] storage scope = requestRecords[requestId];
+            for (uint256 i; i < scope.length; ++i) {
+                MedicalRecord storage record = _requireActiveRecord(scope[i]);
+                if (record.patient != request.patient) revert RecordPatientMismatch(scope[i], request.patient, record.patient);
+            }
+            if (block.timestamp > type(uint64).max - request.requestedDuration) revert InvalidRequestTimestamp();
+            request.activatedAt = uint64(block.timestamp);
+            request.expiresAt = uint64(block.timestamp) + request.requestedDuration;
+            request.status = RequestStatus.ACTIVE;
+        } else {
+            request.status = RequestStatus.REJECTED;
+        }
+        request.attestationHash = keccak256(abi.encode(
+            block.chainid, address(this), requestId, requestHash, approved, observedAt, validUntil
+        ));
+        emit EmergencyResolved(requestId, approved, msg.sender, request.attestationHash, request.activatedAt, request.expiresAt);
     }
 
     function closeEmergency(uint256 requestId, uint16 closureCode) external pure {
@@ -360,15 +396,23 @@ contract MedicalAccessController {
 
     /// @dev Shared by queries and transaction-time authorization; gateway eligibility is checked separately.
     function _canRead(address clinician, bytes32 recordId, uint8 mode, uint256 grantId) internal view returns (bool) {
-        // Emergency grants remain fail-closed until their policy is implemented.
-        if (mode != NORMAL_MODE) return false;
-        Consent storage consent = consents[grantId];
+        if (mode != NORMAL_MODE && mode != EMERGENCY_MODE) return false;
         MedicalRecord storage record = records[recordId];
-        if (
-            !consent.exists || consent.revoked || block.timestamp >= consent.expiresAt
-            || consent.clinician != clinician || consent.recordId != recordId
-            || !record.exists || !record.active || consent.patient != record.patient
-        ) return false;
+        if (!record.exists || !record.active) return false;
+        if (mode == NORMAL_MODE) {
+            Consent storage consent = consents[grantId];
+            if (
+                !consent.exists || consent.revoked || block.timestamp >= consent.expiresAt
+                || consent.clinician != clinician || consent.recordId != recordId || consent.patient != record.patient
+            ) return false;
+        } else {
+            EmergencyRequest storage request = emergencyRequests[grantId];
+            if (
+                !request.exists || request.status != RequestStatus.ACTIVE || block.timestamp >= request.expiresAt
+                || request.clinician != clinician || request.patient != record.patient || !recordIncluded[grantId][recordId]
+                || registry.getParticipant(clinician).facilityId != request.requesterFacilityId
+            ) return false;
+        }
         return registry.isEligible(record.patient, registry.PATIENT_ROLE())
             && registry.isEligible(clinician, registry.CLINICIAN_ROLE())
             && registry.getFacility(record.facilityId).active;

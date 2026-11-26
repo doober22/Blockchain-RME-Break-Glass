@@ -77,6 +77,11 @@
   },
   {
     "inputs": [],
+    "name": "InvalidAttestationTimestamps",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidCiphertextHash",
     "type": "error"
   },
@@ -263,7 +268,40 @@
         "type": "uint256"
       }
     ],
+    "name": "RequestDeadlinePassed",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RequestHashMismatch",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
     "name": "RequestNotFound",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RequestNotPending",
     "type": "error"
   },
   {
@@ -1254,7 +1292,7 @@
     ],
     "name": "resolveEmergency",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {

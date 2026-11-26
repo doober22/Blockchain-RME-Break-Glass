@@ -33,11 +33,10 @@ contract MedicalAccessControllerTest is ControllerFixture {
 
     function testAllUnfinishedAuthorizationAndMutationPathsRevert() public {
         bytes32 id = keccak256("synthetic-record");
-        bytes[] memory calls = new bytes[](4);
-        calls[0] = abi.encodeCall(controller.resolveEmergency, (1, true, id, 1_000, 1_060));
-        calls[1] = abi.encodeCall(controller.closeEmergency, (1, 1));
-        calls[2] = abi.encodeCall(controller.submitReview, (1, 0, id));
-        calls[3] = abi.encodeCall(controller.isReviewOverdue, (1));
+        bytes[] memory calls = new bytes[](3);
+        calls[0] = abi.encodeCall(controller.closeEmergency, (1, 1));
+        calls[1] = abi.encodeCall(controller.submitReview, (1, 0, id));
+        calls[2] = abi.encodeCall(controller.isReviewOverdue, (1));
         for (uint256 i; i < calls.length; ++i) {
             (bool success, bytes memory result) = address(controller).call(calls[i]);
             require(!success, "unfinished path succeeded");
