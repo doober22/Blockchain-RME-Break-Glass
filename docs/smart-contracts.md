@@ -2,7 +2,7 @@
 
 Solidity contracts, ABI exports, tests, and deployment tooling for the RME private chain.
 
-`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` implements record lifecycle, normal consent/revocation, bounded emergency requests and oracle resolution, plus recorded normal/emergency read authorization. Emergency closure, review, and overdue queries remain reverting stubs. The deployment tooling connects both contracts and exports their public interfaces for application services.
+`ParticipantRegistry` manages who participates in the system and whether their credentials are valid. `MedicalAccessController` implements record lifecycle, normal consent, the emergency lifecycle from request to closure and review, and recorded authorization for both access modes. The deployment tooling connects both contracts and exports their public interfaces for application services.
 
 ## Toolchain
 
@@ -55,9 +55,11 @@ Records describe ownership, issuing facility, ciphertext hash, category, and act
 | `authorizeAccess()` | Eligible issuing-facility gateway applies the same current policy, consumes a globally unique nonzero access ID, and emits `AccessAuthorized`. Rejected attempts revert without consuming the ID. |
 | `requestEmergency()` | Eligible clinician creates a pending request for an eligible patient's 1–20 sorted unique active records, binding the encounter, reason, evidence commitment, duration, and 120-second deadline. |
 | `getRequestRecords()` | Returns the stored bounded scope; unknown request IDs revert with `RequestNotFound`. |
-| `getEffectiveStatus()` | Returns the effective status of an existing request, computing expiry at the pending deadline or active expiry. Unknown IDs revert. Rejection is terminal; closure remains unimplemented. |
+| `getEffectiveStatus()` | Returns the effective status of an existing request. Computes expiry at the pending deadline or grant expiry. Rejection and closure are terminal. Unknown IDs revert. |
 | `resolveEmergency()` | Eligible requesting-facility oracle decides a pending request before its deadline with matching hash and fresh bounded timestamps. Rechecks all approval prerequisites, stores a domain-bound attestation hash, and emits `EmergencyResolved`. |
-| `closeEmergency()`, `submitReview()`, `isReviewOverdue()` | Stubs; all revert with `NotImplemented()`. |
+| `closeEmergency()` | The original patient, requesting clinician, or an eligible auditor closes a grant with stored status ACTIVE and emits `EmergencyClosed`. |
+| `submitReview()` | An eligible auditor other than the requesting clinician records one verdict and report commitment per previously activated grant. A misuse verdict closes a grant that still has stored status ACTIVE. |
+| `isReviewOverdue()` | True for an activated grant without a review at or after activation plus 24 hours. Unknown IDs revert. |
 
 The metadata getters return `exists=false` for unknown IDs. Callers must inspect that flag rather than treating default field values as a valid entry. The constructor checks that the registry address contains code; the deployment workflow additionally verifies the expected registry bytecode and controller reference.
 
@@ -91,7 +93,7 @@ Record IDs must be nonzero and strictly ascending by their numeric bytes32 value
 
 Each successful request receives a fresh increasing ID. Repeated equivalent requests are separate requests with separate hashes; submission alone never activates access. Invalid requests leave no metadata/scope and do not consume an ID. `createdAt` is block time and `decisionDeadline = createdAt + 120`. A timestamp that would overflow the uint64 deadline is rejected. Activation, grant expiry, and attestation fields remain zero.
 
-Stored request statuses are `PENDING=0`, `REJECTED=1`, `ACTIVE=2`, and `CLOSED=3`. Effective status additionally includes `EXPIRED=4`. Pending requests become effectively expired at `block.timestamp >= decisionDeadline` without a cleanup transaction or expiry event; stored status and historical fields remain unchanged. Active grants likewise expire effectively at `expiresAt`. Effective status describes lifecycle/time, not current credential eligibility. Requests can now become active or rejected; explicit closure awaits Chunk 5.
+Stored request statuses are `PENDING=0`, `REJECTED=1`, `ACTIVE=2`, and `CLOSED=3`. Effective status additionally includes `EXPIRED=4`. Pending requests expire at `decisionDeadline` and active grants expire at `expiresAt` without a cleanup transaction or expiry event. Stored status changes through decision or closure. Use `canRead` to check current eligibility for a record.
 
 The array returned by `getRequestRecords` is bounded by 20; the contract also stores membership for constant-time emergency scope checks during reads. `getRequest` retains `exists=false` behavior for unknown IDs, while scope/effective-status queries reject unknown IDs. No global history enumeration is added.
 
@@ -135,11 +137,19 @@ These are seven flat ABI arguments (all static). The request hash transitively b
 
 Emergency mode reads require an active existing grant strictly before expiry, its named clinician, the matching patient, and membership of the selected record. The clinician must remain affiliated with the original requesting facility, and common read checks require current patient/clinician eligibility, active record, and active issuing facility. Only the eligible issuing gateway may record authorization. A deactivated scoped record blocks reads of that record; other eligible records retain their own checks. Attestation validity only controls decision acceptance, not the lifetime of the resulting grant.
 
-Normal consent and emergency grants are independent even when their numeric IDs coincide. Revoking normal consent does not close an emergency grant. Access-ID replay protection is shared across both modes. Revoking an oracle prevents its future decisions but does not retroactively erase previously accepted grants; explicit closure is Chunk 5. Credential/facility restoration may restore an otherwise unexpired grant, while changing clinician affiliation denies the original emergency context. No API, oracle worker, clinical validation, wallet-authenticating HTTP gateway, or data delivery is implemented by these contract methods.
+Normal consent and emergency grants are independent even when their numeric IDs coincide. Access-ID replay protection is shared across both modes. Revoking an oracle prevents its future decisions. Accepted grants follow their own closure and expiry rules. Credential or facility restoration may restore access under an otherwise unexpired ACTIVE grant. Changing clinician affiliation denies access under the original emergency context. The API, worker, and HTTP gateway are separate integration milestones.
 
 Additional resolution errors are `RequestNotPending(requestId)`, `RequestDeadlinePassed(requestId)`, `RequestHashMismatch(requestId)`, and `InvalidAttestationTimestamps()`, alongside shared eligibility/facility/record errors and `InvalidRequestTimestamp()` for grant-expiry overflow.
 
-Policy constants: **15 minutes** emergency duration, **60 seconds** attestation age, **120 seconds** request TTL, **20 records** per request, and **24 hours** review target. Request bounds, attestation validation, and activation-based grant expiry are enforced. Review timing and explicit closure await Chunk 5. These are prototype parameters, not clinical standards.
+### Closure and auditor review
+
+The original patient and requesting clinician retain the ability to close their grant after losing role membership or credential eligibility. Other callers must be eligible auditors. Manual closure accepts codes 0–65534. The contract reserves `MISUSE_CLOSURE_CODE() = 65535` for closure triggered by a misuse verdict. Explicit closure applies to stored ACTIVE grants, including effectively expired grants, and preserves activation, expiry, attestation, and scope. Subsequent emergency authorizations fail. Existing normal consent follows its own rules.
+
+An eligible auditor who is a different wallet from the requesting clinician may review a previously activated grant, including after expiry or closure. The review stores the auditor, verdict (`VALID=0` or `SUSPECTED_MISUSE=1`), nonzero report commitment, and review timestamp. The report stays off-chain. A misuse review emits `EmergencyClosed` before `EmergencyReviewed` if the grant still has stored status ACTIVE. An already closed grant receives just the review. A valid verdict records the review and leaves the grant lifecycle state as it was.
+
+The review target is 24 hours from activation. An unreviewed grant becomes overdue exactly at that boundary, and late review stays available. History can identify a late submission by comparing `reviewedAt` with `activatedAt + REVIEW_TARGET`. Pending or rejected requests are never overdue. Unknown request IDs revert with `RequestNotFound`.
+
+Additional errors are `RequestNotActive`, `RequestNeverActivated`, `ReservedClosureCode`, `SelfReviewForbidden`, `ReviewAlreadySubmitted`, `InvalidReviewVerdict`, and `InvalidReportCommitment`, alongside existing eligibility and request errors.
 
 ## Commands
 
@@ -164,9 +174,9 @@ npm test
 | `npm run deploy:besu` | Compile, deploy or verify/reuse contracts, and write public deployment metadata. |
 | `npm run deploy:besu -- --redeploy` | Create new contracts and replace deployment metadata. |
 
-Local tests require no Besu node or private key. Compilation produces expected unused-parameter warnings for stubs.
+Local tests require no Besu node or private key.
 
-Contract tests check registry permissions, invalid inputs, role separation, facility status, and credential expiry, including the exact expiry boundary. Controller tests check registry wiring, metadata reads, constants, record lifecycle, normal consent/authorization policy/events, and rejection by every remaining stub. `ControllerFixture.sol` supplies two facilities, two patients, clinicians, gateways, oracles, and an auditor for policy tests. Deployment/integration tests exercise the CLI's deployment helper and a signed normal-access lifecycle against isolated Hardhat chains with temporary signers and output files.
+Contract tests check registry permissions, role separation, facility status, credential expiry, record lifecycle, normal and emergency authorization, closure, and auditor review. `ControllerFixture.sol` supplies two facilities, two patients, clinicians, gateways, oracles, and an auditor for policy tests. Deployment and signed integration tests run against isolated Hardhat chains with temporary signers and output files.
 
 ## Configuration and deployment
 
@@ -249,6 +259,14 @@ Oracle-resolution verification on **26 November 2026**: `npm --prefix smart-cont
 | FR-08 / partial FR-09 / NFR-06: scoped, current, time-limited reads | doctor/scope/current-credential/record/facility tests, `testFuzzGrantExpiryQueryAndAuthorizationAgree`, signed expiry checks | Passed; allow before expiry, deny at/after it without cleanup; stored grant history retained |
 | FR-12 / NFR-03: authorization events and cross-mode replay protection | full event test, cross-mode replay test, signed cross-facility scenario | Passed; normal and emergency grants are independent but access IDs are globally unique per controller |
 
-The public ABI has been regenerated. The existing `deployments/1337.json` still describes the historical skeleton deployment; this changed controller has **not** been deployed to Besu during Chunks 1–4. Deployment verification will reject reuse against changed artifacts. Explicit deployment/reverification belongs to the contract-release chunk; no ledger reset or existing deployment replacement was performed here.
+Closure and review verification on **26 November 2026** passed compilation, ABI export, TypeScript checking, **112 Solidity tests**, **9 deployment tests**, and **9 request/attestation integration tests**. The 11 lifecycle cases in `EmergencyReview.t.sol` replace the remaining stub check.
 
-FR-11's ciphertext hash metadata is available, but actual integrity checking remains a future gateway task. These results establish normal and oracle-resolved emergency contract authorization, not end-to-end clinical validation, explicit closure/review, medical-data delivery, complete confidentiality, or application latency.
+| Requirement | Evidence | Observed result |
+| --- | --- | --- |
+| FR-09 / NFR-06 | Patient closure, closure after credential expiry, unauthorized actors, and expired grant cases | Closure denies later emergency authorization, retains grant history, and preserves normal consent. |
+| FR-12 / FR-13 / NFR-02 | Review event, misuse closure, self-review, duplicate review, and invalid verdict cases | The audit records one decision by an eligible independent auditor. Misuse closes a stored ACTIVE grant. |
+| FR-13 | Exact overdue boundary and late review | At 24 hours an unreviewed grant becomes overdue. Late review records the actual review timestamp. |
+
+The regenerated ABI describes the current controller. The saved `deployments/1337.json` still describes the historical skeleton deployment. Chunk 6 covers explicit Besu deployment and verification against the release artifacts.
+
+FR-11's ciphertext hash metadata is available. The gateway milestone covers ciphertext integrity, wallet authentication, and delivery. Clinical validation, confidentiality, and application latency also require the off-chain implementation.

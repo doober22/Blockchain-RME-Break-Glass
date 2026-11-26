@@ -31,16 +31,4 @@ contract MedicalAccessControllerTest is ControllerFixture {
         require(!controller.getReview(0).exists);
     }
 
-    function testAllUnfinishedAuthorizationAndMutationPathsRevert() public {
-        bytes32 id = keccak256("synthetic-record");
-        bytes[] memory calls = new bytes[](3);
-        calls[0] = abi.encodeCall(controller.closeEmergency, (1, 1));
-        calls[1] = abi.encodeCall(controller.submitReview, (1, 0, id));
-        calls[2] = abi.encodeCall(controller.isReviewOverdue, (1));
-        for (uint256 i; i < calls.length; ++i) {
-            (bool success, bytes memory result) = address(controller).call(calls[i]);
-            require(!success, "unfinished path succeeded");
-            require(keccak256(result) == keccak256(abi.encodeWithSelector(MedicalAccessController.NotImplemented.selector)));
-        }
-    }
 }

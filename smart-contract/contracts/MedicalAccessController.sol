@@ -11,6 +11,7 @@ contract MedicalAccessController {
     uint64 public constant REQUEST_TTL = 120 seconds;
     uint256 public constant MAX_RECORDS = 20;
     uint64 public constant REVIEW_TARGET = 24 hours;
+    uint16 public constant MISUSE_CLOSURE_CODE = type(uint16).max;
     uint8 public constant NORMAL_MODE = 0;
     uint8 public constant EMERGENCY_MODE = 1;
 
@@ -90,7 +91,6 @@ contract MedicalAccessController {
     uint256 private consentCounter;
     uint256 private requestCounter;
 
-    error NotImplemented();
     error InvalidRegistry();
     error IneligibleParticipant(address account, bytes32 role);
     error InvalidRecordId();
@@ -118,6 +118,13 @@ contract MedicalAccessController {
     error InvalidRequestTimestamp();
     error RequestNotFound(uint256 requestId);
     error RequestNotPending(uint256 requestId);
+    error RequestNotActive(uint256 requestId);
+    error RequestNeverActivated(uint256 requestId);
+    error ReservedClosureCode();
+    error SelfReviewForbidden(uint256 requestId);
+    error ReviewAlreadySubmitted(uint256 requestId);
+    error InvalidReviewVerdict(uint8 verdict);
+    error InvalidReportCommitment();
     error RequestDeadlinePassed(uint256 requestId);
     error RequestHashMismatch(uint256 requestId);
     error InvalidAttestationTimestamps();
@@ -312,12 +319,32 @@ contract MedicalAccessController {
         emit EmergencyResolved(requestId, approved, msg.sender, request.attestationHash, request.activatedAt, request.expiresAt);
     }
 
-    function closeEmergency(uint256 requestId, uint16 closureCode) external pure {
-        revert NotImplemented();
+    function closeEmergency(uint256 requestId, uint16 closureCode) external {
+        EmergencyRequest storage request = _requireRequest(requestId);
+        if (request.status != RequestStatus.ACTIVE) revert RequestNotActive(requestId);
+        if (msg.sender != request.patient && msg.sender != request.clinician) {
+            _requireEligible(msg.sender, registry.AUDITOR_ROLE());
+        }
+        if (closureCode == MISUSE_CLOSURE_CODE) revert ReservedClosureCode();
+        _closeEmergency(requestId, request, closureCode);
     }
 
-    function submitReview(uint256 requestId, uint8 verdict, bytes32 reportCommitment) external pure {
-        revert NotImplemented();
+    function submitReview(uint256 requestId, uint8 verdict, bytes32 reportCommitment) external {
+        EmergencyRequest storage request = _requireRequest(requestId);
+        _requireEligible(msg.sender, registry.AUDITOR_ROLE());
+        if (msg.sender == request.clinician) revert SelfReviewForbidden(requestId);
+        if (!_wasActivated(request)) revert RequestNeverActivated(requestId);
+        if (reviews[requestId].exists) revert ReviewAlreadySubmitted(requestId);
+        if (verdict > uint8(ReviewVerdict.SUSPECTED_MISUSE)) revert InvalidReviewVerdict(verdict);
+        if (reportCommitment == bytes32(0)) revert InvalidReportCommitment();
+
+        ReviewVerdict result = ReviewVerdict(verdict);
+        uint64 reviewedAt = uint64(block.timestamp);
+        reviews[requestId] = Review(true, msg.sender, result, reportCommitment, reviewedAt);
+        if (result == ReviewVerdict.SUSPECTED_MISUSE && request.status == RequestStatus.ACTIVE) {
+            _closeEmergency(requestId, request, MISUSE_CLOSURE_CODE);
+        }
+        emit EmergencyReviewed(requestId, msg.sender, result, reportCommitment, reviewedAt);
     }
 
     function getEffectiveStatus(uint256 requestId) external view returns (EffectiveStatus) {
@@ -348,8 +375,19 @@ contract MedicalAccessController {
         return reviews[requestId];
     }
 
-    function isReviewOverdue(uint256 requestId) external pure returns (bool) {
-        revert NotImplemented();
+    function isReviewOverdue(uint256 requestId) external view returns (bool) {
+        EmergencyRequest storage request = _requireRequest(requestId);
+        return _wasActivated(request) && !reviews[requestId].exists
+            && block.timestamp >= uint256(request.activatedAt) + REVIEW_TARGET;
+    }
+
+    function _wasActivated(EmergencyRequest storage request) private view returns (bool) {
+        return request.status == RequestStatus.ACTIVE || request.status == RequestStatus.CLOSED;
+    }
+
+    function _closeEmergency(uint256 requestId, EmergencyRequest storage request, uint16 closureCode) private {
+        request.status = RequestStatus.CLOSED;
+        emit EmergencyClosed(requestId, msg.sender, closureCode, uint64(block.timestamp));
     }
 
     function _requireEligible(address account, bytes32 role)

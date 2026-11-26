@@ -21,7 +21,7 @@ Frontend hanya boleh menyalin manifest publik dan dua ABI ke build assets. Helpe
 
 ## Consent dan authorization normal (implemented; runtime gateway Planned)
 
-Controller source sekarang mengimplementasikan record lifecycle, consent normal, request/resolution emergency, scope/status getter, serta query/authorization kedua mode. Mode publik: `NORMAL_MODE() = 0`, `EMERGENCY_MODE() = 1`. Mode emergency hanya mengizinkan grant ACTIVE yang sesuai scope/dokter/kredensial/fasilitas dan belum expiry; pending/rejected/expired ditolak. Closure/review masih stub. Manifest 1337 yang tersimpan masih deployment skeleton historis; ABI source terbaru harus dipasangkan dengan deployment baru yang diverifikasi, bukan diasumsikan cocok dengan address lama.
+Controller mengimplementasikan record lifecycle, consent normal, request dan resolution darurat, closure, review, serta query dan authorization kedua mode. `NORMAL_MODE() = 0` dan `EMERGENCY_MODE() = 1`. Mode darurat mensyaratkan grant ACTIVE yang sesuai scope, dokter, kredensial, dan fasilitas, serta belum kedaluwarsa. Manifest 1337 yang tersimpan mencatat deployment skeleton historis. Pasangkan ABI terbaru dengan deployment terverifikasi yang sesuai.
 
 Pasien pemilik record aktif memberi consent untuk satu dokter, satu record, dan expiry Unix seconds di masa depan. Keduanya harus eligible; fasilitas penerbit aktif. Consent normal boleh lintas fasilitas. Pasien asli dapat mencabut consent walaupun kredensial/role-nya sudah tidak aktif. Consent baru mempunyai ID baru; pencabutan tidak menghapus metadata lama.
 
@@ -67,7 +67,13 @@ keccak256(abi.encode(uint256 chainId, address controller, uint256 requestId,
 
 Gunakan `hashEmergencyAttestation` dari `smart-contract/integration/attestation-hash.ts` untuk rekonsiliasi nilai event/storage. Tidak ada signature attestation kedua; tanda tangan transaksi oracle dan role/fasilitas pemanggil menjadi otentikasi on-chain. Helper memvalidasi bentuk/window, bukan chain freshness atau kebenaran data API. Detail error/vector di [panduan kontrak](smart-contracts.md#oracle-resolution-and-emergency-read-authorization).
 
-Gateway kelak memakai mode 1 untuk emergency dan ID request sebagai grantId. Setiap baca memeriksa scope, dokter, afiliasi pemohon asli, kredensial terkini, record/fasilitas aktif, dan `block.timestamp < expiresAt`. Attestation yang sudah expiry tidak menghentikan grant yang telah aktif dan belum berakhir. Consent normal dan emergency independen; accessId tetap unik lintas kedua mode. Pencabutan oracle menghentikan keputusan baru, tidak otomatis menutup grant terdahulu. Closure eksplisit dan review menyusul Chunk 5.
+Gateway kelak memakai mode 1 untuk emergency dan ID request sebagai grantId. Setiap otorisasi memeriksa scope, dokter, afiliasi pemohon asli, kredensial terkini, record dan fasilitas aktif, serta `block.timestamp < expiresAt`. Grant yang diterima mengikuti expiry dan closure masing-masing. Consent normal dan emergency independen. AccessId tetap unik lintas kedua mode.
+
+### Penutupan dan review
+
+Pasien atau dokter pada request dapat memanggil `closeEmergency` meski kredensialnya sudah tidak aktif. Auditor lain memerlukan eligibility terkini. Closure mengubah status tersimpan ACTIVE menjadi CLOSED, termasuk untuk grant yang sudah kedaluwarsa secara efektif. Kode 65535 dikhususkan untuk penutupan otomatis akibat review misuse.
+
+Auditor eligible yang berbeda dari dokter pemohon dapat mencatat satu review setelah aktivasi, termasuk setelah expiry atau closure. Verdict 0 berarti VALID dan 1 berarti SUSPECTED_MISUSE. Review misuse atas grant dengan status tersimpan ACTIVE menghasilkan `EmergencyClosed` lalu `EmergencyReviewed` pada receipt yang sama. Indexer perlu memproses kedua event berdasarkan log index. `isReviewOverdue` memeriksa grant yang pernah diaktifkan dan belum direview pada atau setelah `activatedAt + 24 hours`. Review terlambat tetap diterima, dan keterlambatan dapat dihitung dari timestamp yang tersimpan. Gateway tetap harus memeriksa ulang hak baca sebelum pengiriman.
 
 ### Mock endpoint proyek
 
@@ -97,6 +103,6 @@ Timeout, response rusak/usang, mismatch, atau sumber tidak terautentikasi tidak 
 
 **Role 1:** command lifecycle, onboarding, host/container RPC, reset recovery, dan hasil penerimaan tersedia pada [panduan chain](private-chain.md). Allowlists jaringan bukan role aplikasi.
 
-**Role 2:** selesaikan closure, review, overdue query, dan verifikasi release. Registry, record lifecycle, consent/authorization normal, request/resolution/authorization emergency, scope/status getter, canonical request/attestation hashes, tests, signer, manifest schema, serta ABI exporter sekarang tersedia pada source. Deploy ulang terverifikasi masih diperlukan untuk source terbaru.
+**Role 2:** selesaikan verifikasi release, termasuk deployment Besu untuk controller terbaru. Lifecycle kontrak, helper hash, ABI, dan tes lokal tersedia.
 
 **Role 3/implementer layanan:** integrasikan manifest schema baru, wallet/viem, worker dengan runtime validation/checkpoints, gateway, encrypted storage/key service, indexer/notifikasi, dan demo use-case. Semua komponen tersebut tetap Planned sampai implementasi serta pengujiannya tersedia.

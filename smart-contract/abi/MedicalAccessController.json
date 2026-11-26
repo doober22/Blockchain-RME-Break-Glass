@@ -161,7 +161,23 @@
   },
   {
     "inputs": [],
+    "name": "InvalidReportCommitment",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "InvalidRequestTimestamp",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint8",
+        "name": "verdict",
+        "type": "uint8"
+      }
+    ],
+    "name": "InvalidReviewVerdict",
     "type": "error"
   },
   {
@@ -178,11 +194,6 @@
       }
     ],
     "name": "NotConsentOwner",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "NotImplemented",
     "type": "error"
   },
   {
@@ -290,6 +301,28 @@
         "type": "uint256"
       }
     ],
+    "name": "RequestNeverActivated",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "RequestNotActive",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
     "name": "RequestNotFound",
     "type": "error"
   },
@@ -302,6 +335,33 @@
       }
     ],
     "name": "RequestNotPending",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "ReservedClosureCode",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "ReviewAlreadySubmitted",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "requestId",
+        "type": "uint256"
+      }
+    ],
+    "name": "SelfReviewForbidden",
     "type": "error"
   },
   {
@@ -707,6 +767,19 @@
   },
   {
     "inputs": [],
+    "name": "MISUSE_CLOSURE_CODE",
+    "outputs": [
+      {
+        "internalType": "uint16",
+        "name": "",
+        "type": "uint16"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "NORMAL_MODE",
     "outputs": [
       {
@@ -826,7 +899,7 @@
     ],
     "name": "closeEmergency",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -1174,7 +1247,7 @@
         "type": "bool"
       }
     ],
-    "stateMutability": "pure",
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1328,7 +1401,7 @@
     ],
     "name": "submitReview",
     "outputs": [],
-    "stateMutability": "pure",
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ]
