@@ -29,6 +29,9 @@
     "oracle:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p oracle/tsconfig.json",
     "oracle:test": "node --test oracle/emergency-context.test.ts oracle/worker.test.ts",
     "oracle:test:besu": "node --test oracle/besu.test.ts",
+    "frontend:start": "node frontend/main.ts",
+    "frontend:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p frontend/tsconfig.json",
+    "frontend:test": "node --test frontend/integration.test.ts",
     "contracts:compile": "npm --prefix smart-contract run compile",
     "contracts:test": "npm --prefix smart-contract test",
     "contracts:deploy": "npm --prefix smart-contract run deploy:besu --"
