@@ -2,7 +2,14 @@ import { randomBytes } from "node:crypto";
 import { appendFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { getAddress, verifyMessage, type Hex } from "viem";
-import { ReadDenied, type ReadScope, type connectGateway } from "./chain.ts";
+import {
+  EMERGENCY_MODE,
+  NORMAL_MODE,
+  ReadDenied,
+  type AccessMode,
+  type NormalizedReadScope,
+  type connectGateway,
+} from "./chain.ts";
 import { RecordIntegrityError, type recordStore } from "./records.ts";
 
 const randomId = (): Hex => `0x${randomBytes(32).toString("hex")}`;
@@ -37,15 +44,105 @@ async function body(req: IncomingMessage): Promise<Record<string, unknown>> {
   throw new HttpError(400, "invalid_json");
 }
 
-function readScope(input: Record<string, unknown>): ReadScope {
-  const { clinician, recordId, consentId } = input;
-  if (typeof clinician !== "string" || !/^0x[0-9a-fA-F]{40}$/.test(clinician)
-      || /^0x0{40}$/.test(clinician) || typeof recordId !== "string"
-      || !/^0x[0-9a-f]{64}$/.test(recordId) || /^0x0{64}$/.test(recordId)
-      || typeof consentId !== "string" || !/^[1-9]\d{0,77}$/.test(consentId) || BigInt(consentId) >= (1n << 256n)) {
+function parsePositiveUint256(value: unknown): bigint {
+  if (typeof value !== "string" || !/^[1-9]\d{0,77}$/.test(value)) {
     throw new HttpError(400, "invalid_scope");
   }
-  return { clinician: getAddress(clinician.toLowerCase()), recordId: recordId as Hex, consentId: BigInt(consentId) };
+  const parsed = BigInt(value);
+  if (parsed <= 0n || parsed >= 1n << 256n) {
+    throw new HttpError(400, "invalid_scope");
+  }
+  return parsed;
+}
+
+function parseMode(input: Record<string, unknown>): AccessMode {
+  const { mode, consentId, requestId, grantId } = input;
+  if (consentId !== undefined && requestId !== undefined) {
+    throw new HttpError(400, "invalid_scope");
+  }
+  if (mode === undefined) {
+    if (requestId !== undefined && grantId === undefined) return EMERGENCY_MODE;
+    if (consentId !== undefined && grantId === undefined) return NORMAL_MODE;
+    throw new HttpError(400, "invalid_scope");
+  }
+  if (mode === NORMAL_MODE || mode === "normal" || mode === "NORMAL") {
+    if (requestId !== undefined) throw new HttpError(400, "invalid_scope");
+    return NORMAL_MODE;
+  }
+  if (mode === EMERGENCY_MODE || mode === "emergency" || mode === "EMERGENCY") {
+    if (consentId !== undefined) throw new HttpError(400, "invalid_scope");
+    return EMERGENCY_MODE;
+  }
+  throw new HttpError(400, "invalid_scope");
+}
+
+function readScope(input: Record<string, unknown>): NormalizedReadScope {
+  const { clinician, recordId, consentId, requestId, grantId } = input;
+  if (
+    typeof clinician !== "string" ||
+    !/^0x[0-9a-fA-F]{40}$/.test(clinician) ||
+    /^0x0{40}$/.test(clinician) ||
+    typeof recordId !== "string" ||
+    !/^0x[0-9a-f]{64}$/.test(recordId) ||
+    /^0x0{64}$/.test(recordId)
+  ) {
+    throw new HttpError(400, "invalid_scope");
+  }
+  const mode = parseMode(input);
+  const rawGrant =
+    mode === EMERGENCY_MODE
+      ? (grantId ?? requestId)
+      : (grantId ?? consentId);
+  if (
+    (mode === EMERGENCY_MODE && grantId !== undefined && requestId !== undefined && grantId !== requestId) ||
+    (mode === NORMAL_MODE && grantId !== undefined && consentId !== undefined && grantId !== consentId)
+  ) {
+    throw new HttpError(400, "invalid_scope");
+  }
+  return {
+    clinician: getAddress(clinician.toLowerCase()),
+    recordId: recordId as Hex,
+    mode,
+    grantId: parsePositiveUint256(rawGrant),
+  };
+}
+
+function buildChallengeMessage(config: {
+  origin: string;
+  controller: string;
+  gateway: string;
+  scope: NormalizedReadScope;
+  nonce: Hex;
+  expiresAt: number;
+}): string {
+  const { scope, nonce, expiresAt } = config;
+  if (scope.mode === NORMAL_MODE) {
+    return [
+      "RME gateway authorization for one normal record read",
+      `Service: ${config.origin}`,
+      "Chain ID: 1337",
+      `Controller: ${config.controller}`,
+      `Gateway: ${config.gateway}`,
+      `Clinician: ${scope.clinician}`,
+      `Record: ${scope.recordId}`,
+      `Consent: ${scope.grantId}`,
+      `Nonce: ${nonce}`,
+      `Expires: ${new Date(expiresAt).toISOString()}`,
+    ].join("\n");
+  }
+  return [
+    "RME gateway authorization for one emergency break-glass record read",
+    `Service: ${config.origin}`,
+    "Chain ID: 1337",
+    `Controller: ${config.controller}`,
+    `Gateway: ${config.gateway}`,
+    `Clinician: ${scope.clinician}`,
+    `Record: ${scope.recordId}`,
+    "Mode: EMERGENCY (1)",
+    `Emergency Request: ${scope.grantId}`,
+    `Nonce: ${nonce}`,
+    `Expires: ${new Date(expiresAt).toISOString()}`,
+  ].join("\n");
 }
 
 function json(res: ServerResponse, status: number, value: object) {
@@ -69,7 +166,7 @@ export function createGateway(config: {
   chain: Awaited<ReturnType<typeof connectGateway>>; store: ReturnType<typeof recordStore>; auditPath: string;
   gateway: string; controller: string; origin: () => string;
 }) {
-  const challenges = new Map<Hex, { scope: ReadScope; message: string; expiresAt: number }>();
+  const challenges = new Map<Hex, { scope: NormalizedReadScope; message: string; expiresAt: number }>();
   let authorizing = false;
   return createServer({ requestTimeout: 10_000, headersTimeout: 5_000, connectionsCheckingInterval: 1_000 }, async (req, res) => {
     try {
@@ -84,14 +181,16 @@ export function createGateway(config: {
         if (challenges.size >= 512) throw new HttpError(429, "too_many_challenges");
         const nonce = randomId();
         const expiresAt = now + challengeTtlMs;
-        const message = [
-          "RME gateway authorization for one normal record read",
-          `Service: ${config.origin()}`, "Chain ID: 1337", `Controller: ${config.controller}`,
-          `Gateway: ${config.gateway}`, `Clinician: ${scope.clinician}`, `Record: ${scope.recordId}`,
-          `Consent: ${scope.consentId}`, `Nonce: ${nonce}`, `Expires: ${new Date(expiresAt).toISOString()}`,
-        ].join("\n");
+        const message = buildChallengeMessage({
+          origin: config.origin(),
+          controller: config.controller,
+          gateway: config.gateway,
+          scope,
+          nonce,
+          expiresAt,
+        });
         challenges.set(nonce, { scope, message, expiresAt });
-        return json(res, 201, { nonce, message, expiresAt });
+        return json(res, 201, { nonce, message, expiresAt, mode: scope.mode, grantId: scope.grantId.toString() });
       }
 
       const { nonce, signature } = input;
@@ -113,7 +212,14 @@ export function createGateway(config: {
       let transaction: Hex | undefined;
       const accessId = randomId();
       const audit = (outcome: string) => appendFile(config.auditPath, JSON.stringify({
-        accessId, transaction, outcome, time: new Date().toISOString(),
+        accessId,
+        mode: scope.mode,
+        grantId: scope.grantId.toString(),
+        recordId: scope.recordId,
+        clinician: scope.clinician,
+        transaction,
+        outcome,
+        time: new Date().toISOString(),
       }) + "\n", { mode: 0o600 });
       let outcome = "failed";
       try {

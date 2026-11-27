@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=24.0.0 <25" },
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
   "scripts": {
     "chain:init": "node infrastructure/chain.mjs init",
     "chain:start": "node infrastructure/chain.mjs start",
@@ -21,6 +23,7 @@
     "chain:verify": "node infrastructure/verify.mjs",
     "gateway:start": "node gateway/main.ts",
     "gateway:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p gateway/tsconfig.json",
+    "gateway:test": "node --test gateway/emergency-break-glass.test.ts",
     "gateway:test:besu": "node --test gateway/normal-consent.test.ts",
     "oracle:start": "node oracle/main.ts",
     "oracle:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p oracle/tsconfig.json",
@@ -30,5 +33,7 @@
     "contracts:test": "npm --prefix smart-contract test",
     "contracts:deploy": "npm --prefix smart-contract run deploy:besu --"
   },
-  "dependencies": { "viem": "2.57.16" }
+  "dependencies": {
+    "viem": "2.57.16"
+  }
 }

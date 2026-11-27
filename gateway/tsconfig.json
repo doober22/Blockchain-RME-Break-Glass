@@ -3,5 +3,5 @@
   "compilerOptions": {
     "typeRoots": ["../smart-contract/node_modules/@types"]
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "../oracle/*.ts", "../smart-contract/integration/*.ts"]
 }
