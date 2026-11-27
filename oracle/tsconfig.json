@@ -1,0 +1,7 @@
+{
+  "extends": "../smart-contract/tsconfig.json",
+  "compilerOptions": {
+    "typeRoots": ["../smart-contract/node_modules/@types"]
+  },
+  "include": ["*.ts", "../smart-contract/integration/*.ts"]
+}

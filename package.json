@@ -22,6 +22,8 @@
     "gateway:start": "node gateway/main.ts",
     "gateway:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p gateway/tsconfig.json",
     "gateway:test:besu": "node --test gateway/normal-consent.test.ts",
+    "oracle:typecheck": "node smart-contract/node_modules/typescript/bin/tsc -p oracle/tsconfig.json",
+    "oracle:test": "node --test oracle/emergency-context.test.ts",
     "contracts:compile": "npm --prefix smart-contract run compile",
     "contracts:test": "npm --prefix smart-contract test",
     "contracts:deploy": "npm --prefix smart-contract run deploy:besu --"
